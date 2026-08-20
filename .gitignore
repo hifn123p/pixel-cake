@@ -1,0 +1,11 @@
+/target
+**/*.rs.bk
+*.pdb
+.idea/
+.vscode/
+
+# 前端
+node_modules/
+dist/
+.tmp_check/
+

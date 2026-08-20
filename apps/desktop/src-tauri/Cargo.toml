@@ -1,0 +1,24 @@
+[package]
+name = "pixel-cake"
+version.workspace = true
+edition.workspace = true
+description = "像素蛋糕 Windows 11 客户端（本地修图，3070 GPU 推理）"
+default-run = "pixel-cake"
+
+[lib]
+name = "pixel_cake_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+bus = { path = "../../../crates/bus" }
+scheduler = { path = "../../../crates/scheduler" }
+storage = { path = "../../../crates/storage" }

@@ -1,0 +1,10 @@
+[package]
+name = "engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bus = { path = "../bus" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "storage"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bus = { path = "../bus" }
+serde.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "scheduler"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bus = { path = "../bus" }
+tokio.workspace = true
+thiserror.workspace = true
