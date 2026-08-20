@@ -1,6 +1,9 @@
 # 像素蛋糕 Windows 客户端 CI：编译测试 + 打包安装包
 # 在 GitHub 托管的 windows-latest（自带 MSVC + Windows SDK + WebView2）上执行，
 # 解决本地缺链接器的问题。产物为 NSIS 安装包 (.exe)。
+#
+# 说明：图标文件（icon.ico/png）不入库，由 scripts/gen_icon.mjs 在 CI 内生成，
+# 避免二进制文件传输问题。
 
 name: CI
 
@@ -20,6 +23,14 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 生成图标
+        run: node scripts/gen_icon.mjs
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
@@ -46,18 +57,21 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装 Rust 工具链
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: 缓存 Cargo 依赖
-        uses: Swatinem/rust-cache@v2
-
       - name: 安装 Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/desktop/ui/package-lock.json
+
+      - name: 生成图标
+        run: node scripts/gen_icon.mjs
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Cargo 依赖
+        uses: Swatinem/rust-cache@v2
 
       - name: 安装前端依赖
         working-directory: apps/desktop/ui

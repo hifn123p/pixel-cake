@@ -9,3 +9,6 @@ node_modules/
 dist/
 .tmp_check/
 
+# 图标由 scripts/gen_icon.mjs 在 CI 内生成，不入库（避免二进制传输）
+apps/desktop/src-tauri/icons/
+
