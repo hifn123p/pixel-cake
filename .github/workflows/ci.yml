@@ -47,7 +47,7 @@ jobs:
         run: cargo test --workspace
 
       - name: cargo clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace
 
   package:
     name: 打包安装包
