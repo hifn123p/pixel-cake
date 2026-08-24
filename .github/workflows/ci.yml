@@ -62,7 +62,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/desktop/ui/package-lock.json
+          cache-dependency-path: apps/desktop/package-lock.json
 
       - name: 生成图标
         run: node scripts/gen_icon.mjs
@@ -74,11 +74,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: 安装前端依赖
-        working-directory: apps/desktop/ui
+        working-directory: apps/desktop
         run: npm ci
 
       - name: Tauri 打包（NSIS）
-        working-directory: apps/desktop/ui
+        working-directory: apps/desktop
         run: npm run tauri build
 
       - name: 上传安装包
