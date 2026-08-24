@@ -3,8 +3,12 @@
 //! 元数据（项目/照片/recipe/预设/模型）入 SQLite，库静态编译进二进制，无外部服务。
 //! 大文件（原图/代理/成品/蒙版/模型/LUT）存本地目录，SQLite 仅存路径与元数据，
 //! 避免库膨胀。
+//!
+//! 注：`rusqlite::Connection` 非 `Sync`，故以 `Mutex` 包裹，使 `Store` 满足
+//! Tauri `State` 要求的 `Send + Sync`。
 
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bus::Recipe;
@@ -95,7 +99,7 @@ pub type Result<T> = std::result::Result<T, StorageError>;
 
 /// SQLite 数据访问门面。
 pub struct Store {
-    conn: Connection,
+    conn: Mutex<Connection>,
 }
 
 impl Store {
@@ -103,20 +107,25 @@ impl Store {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.execute_batch(SCHEMA)?;
-        Ok(Self { conn })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// 内存库（测试用）。
     pub fn in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         conn.execute_batch(SCHEMA)?;
-        Ok(Self { conn })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     pub fn create_project(&self, name: &str, root_path: &str) -> Result<Project> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = now_secs();
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT INTO project(id, name, created_at, root_path) VALUES (?1, ?2, ?3, ?4)",
             params![id, name, now, root_path],
         )?;
@@ -130,9 +139,10 @@ impl Store {
     }
 
     pub fn list_projects(&self) -> Result<Vec<Project>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, name, created_at, root_path, thumb FROM project ORDER BY created_at DESC")?;
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, created_at, root_path, thumb FROM project ORDER BY created_at DESC",
+        )?;
         let rows = stmt.query_map([], |r| {
             Ok(Project {
                 id: r.get(0)?,
@@ -153,10 +163,11 @@ impl Store {
     ) -> Result<Vec<Photo>> {
         let mut out = Vec::with_capacity(paths.len());
         let now = now_secs();
+        let conn = self.conn.lock().unwrap();
         for p in paths {
             let id = uuid::Uuid::new_v4().to_string();
             let (w, h) = dims(p);
-            self.conn.execute(
+            conn.execute(
                 "INSERT INTO photo(id, project_id, raw_path, width, height, status, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6)",
                 params![id, project_id, p, w, h, now],
@@ -177,17 +188,17 @@ impl Store {
     }
 
     pub fn list_photos(&self, project_id: &str) -> Result<Vec<Photo>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, project_id, raw_path, proxy_path, result_path, width, height, status, created_at FROM photo WHERE project_id = ?1")?;
-        let rows = stmt.query_map(params![project_id], |r| {
-            Ok(row_to_photo(r)?)
-        })?;
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, raw_path, proxy_path, result_path, width, height, status, created_at FROM photo WHERE project_id = ?1",
+        )?;
+        let rows = stmt.query_map(params![project_id], |r| Ok(row_to_photo(r)?))?;
         rows.collect::<SqlResult<Vec<_>>>().map_err(Into::into)
     }
 
     pub fn update_photo_status(&self, photo_id: &str, status: PhotoStatus) -> Result<()> {
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "UPDATE photo SET status = ?1 WHERE id = ?2",
             params![status.as_str(), photo_id],
         )?;
@@ -197,7 +208,8 @@ impl Store {
     pub fn save_recipe(&self, photo_id: &str, recipe: &Recipe) -> Result<()> {
         let data = recipe.to_json();
         let now = now_secs();
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT INTO recipe(photo_id, data, updated_at) VALUES (?1, ?2, ?3)
              ON CONFLICT(photo_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at",
             params![photo_id, data, now],
@@ -206,9 +218,8 @@ impl Store {
     }
 
     pub fn get_recipe(&self, photo_id: &str) -> Result<Option<Recipe>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT data FROM recipe WHERE photo_id = ?1")?;
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT data FROM recipe WHERE photo_id = ?1")?;
         let mut rows = stmt.query(params![photo_id])?;
         if let Some(row) = rows.next()? {
             let data: String = row.get(0)?;
@@ -218,10 +229,17 @@ impl Store {
         }
     }
 
-    pub fn save_preset(&self, name: &str, scope: &str, recipe: &Recipe, lut_path: Option<&str>) -> Result<Preset> {
+    pub fn save_preset(
+        &self,
+        name: &str,
+        scope: &str,
+        recipe: &Recipe,
+        lut_path: Option<&str>,
+    ) -> Result<Preset> {
         let id = uuid::Uuid::new_v4().to_string();
         let recipe_json = recipe.to_json();
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT INTO preset(id, name, scope, recipe_json, lut_path) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![id, name, scope, recipe_json, lut_path],
         )?;
@@ -235,9 +253,8 @@ impl Store {
     }
 
     pub fn list_presets(&self) -> Result<Vec<Preset>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, name, scope, recipe_json, lut_path FROM preset")?;
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, name, scope, recipe_json, lut_path FROM preset")?;
         let rows = stmt.query_map([], |r| {
             Ok(Preset {
                 id: r.get(0)?,
@@ -251,7 +268,8 @@ impl Store {
     }
 
     pub fn register_model(&self, m: &ModelMeta) -> Result<()> {
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT INTO model(id, name, path, version, hash, enabled) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
              ON CONFLICT(id) DO UPDATE SET version = excluded.version, hash = excluded.hash, enabled = excluded.enabled",
             params![m.id, m.name, m.path, m.version, m.hash, m.enabled as i32],
