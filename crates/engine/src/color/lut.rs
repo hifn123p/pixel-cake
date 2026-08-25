@@ -110,7 +110,7 @@ mod tests {
     fn identity_lut_is_identity() {
         let lut = Lut3D::identity(33);
         for &v in &[[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [0.3, 0.7, 0.9], [1.0, 1.0, 1.0]] {
-            let out = lut.apply(*v);
+            let out = lut.apply(v);
             for i in 0..3 {
                 assert!((out[i] - v[i]).abs() < 1e-4);
             }
