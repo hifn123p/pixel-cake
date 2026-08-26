@@ -122,7 +122,8 @@ impl Scheduler {
 
 impl Default for Scheduler {
     fn default() -> Self {
-        Self::new()
+        // 默认空模型目录：AI 功能降级为纯参数处理。
+        Self::new(Path::new(""))
     }
 }
 
