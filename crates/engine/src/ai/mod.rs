@@ -5,7 +5,7 @@
 //!
 //! 当前接入：SCRFD 人脸检测（磨皮/美型的前置），由 5 点关键点生成
 //! 「大眼」液化点，驱动美型 warp；2DFAN4 68 点关键点（精细美型）；
-//! BiSeNet 19 类人脸解析（追色分区）。
+//! BiSeNet 19 类人脸解析（追色分区）；GPEN 皮肤增强（磨皮）。
 
 use std::path::Path;
 
@@ -14,17 +14,19 @@ use crate::detect::landmark::Landmarker;
 use crate::detect::segment::{SegMask, Segmenter};
 use crate::image::ImageBuf;
 use crate::retouch::beauty::LiquifyPoint;
+use crate::retouch::enhance::Enhancer;
 
 /// AI 门面：惰性加载可用模型（缺失则对应检测返回 `None`）。
 pub struct RetouchEngine {
     face_detector: Option<FaceDetector>,
     landmarker: Option<Landmarker>,
     segmenter: Option<Segmenter>,
+    enhancer: Option<Enhancer>,
 }
 
 impl RetouchEngine {
-    /// 从模型目录构建；`scrfd_2.5g.onnx` / `2dfan4.onnx` / `bisenet_resnet_34.onnx`
-    /// 存在才加载对应检测器。
+    /// 从模型目录构建；`scrfd_2.5g.onnx` / `2dfan4.onnx` / `bisenet_resnet_34.onnx` /
+    /// `gpen_bfr_512.onnx` 存在才加载对应模型。
     pub fn new(models_dir: &Path) -> Self {
         let face_path = models_dir.join("scrfd_2.5g.onnx");
         let face_detector = if face_path.exists() {
@@ -65,10 +67,24 @@ impl RetouchEngine {
             None
         };
 
+        let enhance_path = models_dir.join("gpen_bfr_512.onnx");
+        let enhancer = if enhance_path.exists() {
+            match Enhancer::new(enhance_path.to_str().unwrap_or_default()) {
+                Ok(e) => Some(e),
+                Err(err) => {
+                    eprintln!("[retouch] 加载皮肤增强器失败，磨皮将降级: {err}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             face_detector,
             landmarker,
             segmenter,
+            enhancer,
         }
     }
 
@@ -85,6 +101,23 @@ impl RetouchEngine {
     /// 是否已加载人脸解析器。
     pub fn has_segmenter(&self) -> bool {
         self.segmenter.is_some()
+    }
+
+    /// 是否已加载皮肤增强器。
+    pub fn has_enhancer(&self) -> bool {
+        self.enhancer.is_some()
+    }
+
+    /// 增强单张人脸皮肤（模型未加载或推理失败时返回 `None`）。
+    pub fn enhance_face(
+        &mut self,
+        img: &ImageBuf,
+        bbox: [f32; 4],
+        blend: f32,
+    ) -> Option<ImageBuf> {
+        self.enhancer
+            .as_mut()
+            .and_then(|e| e.enhance(img, bbox, blend).ok())
     }
 
     /// 检测图像中的所有人脸（模型未加载或推理失败时返回 `None`）。

@@ -2,5 +2,6 @@
 
 pub mod beauty;
 pub mod color_transfer;
+pub mod enhance;
 pub mod inpaint;
 pub mod neutral_gray;
