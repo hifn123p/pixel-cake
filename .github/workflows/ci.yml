@@ -15,6 +15,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # LibRaw 静态链接需定义 LIBRAW_NODLL，否则 MSVC 报 C2491 dllimport 冲突
+  # （libraw-rs-sys 的 build.rs 未内置此宏，故经 cc crate 的 CXXFLAGS 传入）
+  CXXFLAGS: -DLIBRAW_NODLL
+  CFLAGS: -DLIBRAW_NODLL
 
 jobs:
   test:
