@@ -41,6 +41,41 @@ impl RawDecoder for PpmDecoder {
     }
 }
 
+/// LibRaw FFI 解码器（CR2/ARW/NEF/DNG 等相机 RAW）。
+///
+/// 经 `libraw-rs`（vendored 静态编译 LibRaw）解码 + dcraw 处理为 16bit RGB。
+/// dcraw 输出为 sRGB（带 gamma），此处先直存，后续在 image 层统一转线性。
+pub struct LibRawDecoder;
+
+impl RawDecoder for LibRawDecoder {
+    fn decode(&self, bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
+        let processor = libraw::Processor::new();
+        let image = processor
+            .process_16bit(bytes)
+            .map_err(|_| DecodeError::UnsupportedFormat)?;
+        let w = image.width();
+        let h = image.height();
+        let data: &[u16] = &image;
+
+        let mut img = ImageBuf::new(w, h, ColorSpace::Linear);
+        for y in 0..h {
+            for x in 0..w {
+                let idx = ((y * w + x) * 3) as usize;
+                if idx + 2 >= data.len() {
+                    return Err(DecodeError::Truncated);
+                }
+                let c = [
+                    data[idx] as f32 / 65535.0,
+                    data[idx + 1] as f32 / 65535.0,
+                    data[idx + 2] as f32 / 65535.0,
+                ];
+                img.set_pixel(x, y, [c[0], c[1], c[2], 1.0]);
+            }
+        }
+        Ok(img)
+    }
+}
+
 /// 解析 PPM P6（binary RGB）。
 pub fn decode_ppm(bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
     if bytes.len() < 2 || &bytes[0..2] != b"P6" {

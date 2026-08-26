@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 bus = { path = "../bus" }
+libraw-rs = "0.0.4"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
