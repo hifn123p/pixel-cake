@@ -120,6 +120,65 @@ impl RetouchEngine {
         }
         pts
     }
+
+    /// 由 68 点关键点生成「瘦脸 + 大眼」液化点（归一化坐标）。
+    ///
+    /// - 瘦脸：下颌轮廓点（索引 3..=13）朝脸部中心（鼻尖 33）向内推；
+    /// - 大眼：双眼轮廓点（36..=41 / 42..=47）从眼中心向外推。
+    ///
+    /// 68 点顺序为 dlib/FAN 标准（0-16 轮廓、17-26 眉、27-35 鼻、36-47 眼、48-67 嘴）。
+    pub fn face_beauty_points(landmarks: &[[f32; 2]; 68], w: u32, h: u32) -> Vec<LiquifyPoint> {
+        let wf = w.max(1) as f32;
+        let hf = h.max(1) as f32;
+        let mut pts = Vec::new();
+
+        // 脸部中心：鼻尖（索引 33）
+        let (cx, cy) = (landmarks[33][0], landmarks[33][1]);
+
+        // 1. 瘦脸：下颌轮廓向内推
+        for i in 3..=13usize {
+            let (px, py) = (landmarks[i][0], landmarks[i][1]);
+            let vx = px - cx;
+            let vy = py - cy;
+            let dist = (vx * vx + vy * vy).sqrt().max(1.0);
+            let k = dist * 0.02; // 推拉强度随距中心距离增大
+            pts.push(LiquifyPoint {
+                x: px / wf,
+                y: py / hf,
+                dx: -vx / dist * k / wf,
+                dy: -vy / dist * k / hf,
+                radius: (dist * 0.5 / wf).max(0.01),
+            });
+        }
+
+        // 2. 大眼：双眼轮廓向外推
+        for eye_range in [36..=41usize, 42..=47usize] {
+            let mut ex = 0.0f32;
+            let mut ey = 0.0f32;
+            for i in eye_range.clone() {
+                ex += landmarks[i][0];
+                ey += landmarks[i][1];
+            }
+            ex /= 6.0;
+            ey /= 6.0;
+            for i in eye_range {
+                let (px, py) = (landmarks[i][0], landmarks[i][1]);
+                let vx = px - ex;
+                let vy = py - ey;
+                let dist = (vx * vx + vy * vy).sqrt().max(1.0);
+                let k = dist * 0.08;
+                pts.push(LiquifyPoint {
+                    x: px / wf,
+                    y: py / hf,
+                    dx: vx / dist * k / wf,
+                    dy: vy / dist * k / hf,
+                    radius: dist / wf,
+                });
+            }
+        }
+
+        pts
+    }
 }
 
 #[cfg(test)]
@@ -150,6 +209,28 @@ mod tests {
             assert!((0.0..=1.0).contains(&p.x));
             assert!((0.0..=1.0).contains(&p.y));
             assert!(p.radius > 0.0);
+        }
+    }
+
+    #[test]
+    fn face_beauty_points_count() {
+        // 构造 68 点：鼻尖 (50,50)，下颌向外放，双眼各 6 点
+        let mut lm = [[50.0f32, 50.0]; 68];
+        for i in 3..=13 {
+            lm[i] = [50.0 + (i as f32 - 8.0) * 5.0, 70.0];
+        }
+        for i in 36..=41 {
+            lm[i] = [40.0 + (i as f32 - 36.0) * 2.0, 40.0];
+        }
+        for i in 42..=47 {
+            lm[i] = [60.0 + (i as f32 - 42.0) * 2.0, 40.0];
+        }
+        // 11 个瘦脸点 + 12 个大眼点
+        let pts = RetouchEngine::face_beauty_points(&lm, 100, 100);
+        assert_eq!(pts.len(), 23);
+        for p in &pts {
+            assert!((0.0..=1.0).contains(&p.x));
+            assert!((0.0..=1.0).contains(&p.y));
         }
     }
 }

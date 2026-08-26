@@ -191,12 +191,24 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     // 2. Recipe → Pipeline
     let mut pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
 
-    // 3. AI：检测人脸 → 自动美型液化点（模型缺失时降级为仅手动控制点）
+    // 3. AI：检测人脸 → 精细美型（68 点瘦脸/大眼），关键点模型缺失时回退 5 点大眼
     {
         let mut eng = engine.lock().expect("engine mutex poisoned");
         if let Some(faces) = eng.detect_faces(&img) {
-            let pts = RetouchEngine::auto_beauty_points(&faces, img.width, img.height);
-            pipeline.beauty_points.extend(pts);
+            let mut beauty = Vec::new();
+            for f in &faces {
+                if let Some(lm) = eng.detect_landmarks(&img, f.bbox) {
+                    beauty.extend(RetouchEngine::face_beauty_points(
+                        &lm,
+                        img.width,
+                        img.height,
+                    ));
+                }
+            }
+            if beauty.is_empty() {
+                beauty = RetouchEngine::auto_beauty_points(&faces, img.width, img.height);
+            }
+            pipeline.beauty_points.extend(beauty);
         }
     }
 
