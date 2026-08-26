@@ -4,12 +4,14 @@
 //! 自动降级（检测返回 `None`），管线退化为纯参数处理。
 //!
 //! 当前接入：SCRFD 人脸检测（磨皮/美型的前置），由 5 点关键点生成
-//! 「大眼」液化点，驱动美型 warp；2DFAN4 68 点关键点（精细美型）。
+//! 「大眼」液化点，驱动美型 warp；2DFAN4 68 点关键点（精细美型）；
+//! BiSeNet 19 类人脸解析（追色分区）。
 
 use std::path::Path;
 
 use crate::detect::face::{DetectedFace, FaceDetector};
 use crate::detect::landmark::Landmarker;
+use crate::detect::segment::{SegMask, Segmenter};
 use crate::image::ImageBuf;
 use crate::retouch::beauty::LiquifyPoint;
 
@@ -17,10 +19,12 @@ use crate::retouch::beauty::LiquifyPoint;
 pub struct RetouchEngine {
     face_detector: Option<FaceDetector>,
     landmarker: Option<Landmarker>,
+    segmenter: Option<Segmenter>,
 }
 
 impl RetouchEngine {
-    /// 从模型目录构建；`scrfd_2.5g.onnx` / `2dfan4.onnx` 存在才加载对应检测器。
+    /// 从模型目录构建；`scrfd_2.5g.onnx` / `2dfan4.onnx` / `bisenet_resnet_34.onnx`
+    /// 存在才加载对应检测器。
     pub fn new(models_dir: &Path) -> Self {
         let face_path = models_dir.join("scrfd_2.5g.onnx");
         let face_detector = if face_path.exists() {
@@ -48,9 +52,23 @@ impl RetouchEngine {
             None
         };
 
+        let segment_path = models_dir.join("bisenet_resnet_34.onnx");
+        let segmenter = if segment_path.exists() {
+            match Segmenter::new(segment_path.to_str().unwrap_or_default()) {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    eprintln!("[retouch] 加载人脸解析器失败，追色分区将降级: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             face_detector,
             landmarker,
+            segmenter,
         }
     }
 
@@ -62,6 +80,11 @@ impl RetouchEngine {
     /// 是否已加载关键点检测器。
     pub fn has_landmarker(&self) -> bool {
         self.landmarker.is_some()
+    }
+
+    /// 是否已加载人脸解析器。
+    pub fn has_segmenter(&self) -> bool {
+        self.segmenter.is_some()
     }
 
     /// 检测图像中的所有人脸（模型未加载或推理失败时返回 `None`）。
@@ -80,6 +103,13 @@ impl RetouchEngine {
         self.landmarker
             .as_mut()
             .and_then(|l| l.detect(img, bbox).ok())
+    }
+
+    /// 对单张人脸做 19 类分割（模型未加载或推理失败时返回 `None`）。
+    pub fn segment_face(&mut self, img: &ImageBuf, bbox: [f32; 4]) -> Option<SegMask> {
+        self.segmenter
+            .as_mut()
+            .and_then(|s| s.segment(img, bbox).ok())
     }
 
     /// 由 5 点关键点生成「大眼」液化点（归一化坐标）。

@@ -2,6 +2,8 @@
 //!
 //! - `face`：SCRFD 人脸检测（bbox + 5 点关键点）
 //! - `landmark`：2DFAN4 68 点关键点（精细美型）
+//! - `segment`：BiSeNet 19 类人脸解析（追色分区）
 
 pub mod face;
 pub mod landmark;
+pub mod segment;
