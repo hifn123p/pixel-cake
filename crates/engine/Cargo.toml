@@ -6,6 +6,10 @@ edition.workspace = true
 [dependencies]
 bus = { path = "../bus" }
 libraw-rs = "0.0.4"
+# ONNX Runtime（CUDA EP）。默认 features 含 download-binaries（构建时下载 ORT 二进制）
+# 与 copy-dylibs（复制 onnxruntime*.dll 到 target）。cuda feature 启用 CUDA 执行提供者。
+ort = { version = "2.0.0-rc.13", features = ["cuda"] }
+ndarray = "0.17"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
