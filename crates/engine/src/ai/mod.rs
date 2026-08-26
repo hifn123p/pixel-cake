@@ -4,21 +4,23 @@
 //! 自动降级（检测返回 `None`），管线退化为纯参数处理。
 //!
 //! 当前接入：SCRFD 人脸检测（磨皮/美型的前置），由 5 点关键点生成
-//! 「大眼」液化点，驱动美型 warp。
+//! 「大眼」液化点，驱动美型 warp；2DFAN4 68 点关键点（精细美型）。
 
 use std::path::Path;
 
 use crate::detect::face::{DetectedFace, FaceDetector};
+use crate::detect::landmark::Landmarker;
 use crate::image::ImageBuf;
 use crate::retouch::beauty::LiquifyPoint;
 
 /// AI 门面：惰性加载可用模型（缺失则对应检测返回 `None`）。
 pub struct RetouchEngine {
     face_detector: Option<FaceDetector>,
+    landmarker: Option<Landmarker>,
 }
 
 impl RetouchEngine {
-    /// 从模型目录构建；`scrfd_2.5g.onnx` 存在才加载人脸检测器。
+    /// 从模型目录构建；`scrfd_2.5g.onnx` / `2dfan4.onnx` 存在才加载对应检测器。
     pub fn new(models_dir: &Path) -> Self {
         let face_path = models_dir.join("scrfd_2.5g.onnx");
         let face_detector = if face_path.exists() {
@@ -32,7 +34,24 @@ impl RetouchEngine {
         } else {
             None
         };
-        Self { face_detector }
+
+        let landmark_path = models_dir.join("2dfan4.onnx");
+        let landmarker = if landmark_path.exists() {
+            match Landmarker::new(landmark_path.to_str().unwrap_or_default()) {
+                Ok(l) => Some(l),
+                Err(e) => {
+                    eprintln!("[retouch] 加载关键点检测器失败，精细美型将降级: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        Self {
+            face_detector,
+            landmarker,
+        }
     }
 
     /// 是否已加载人脸检测器。
@@ -40,11 +59,27 @@ impl RetouchEngine {
         self.face_detector.is_some()
     }
 
+    /// 是否已加载关键点检测器。
+    pub fn has_landmarker(&self) -> bool {
+        self.landmarker.is_some()
+    }
+
     /// 检测图像中的所有人脸（模型未加载或推理失败时返回 `None`）。
     pub fn detect_faces(&mut self, img: &ImageBuf) -> Option<Vec<DetectedFace>> {
         self.face_detector
             .as_mut()
             .and_then(|d| d.detect(img).ok())
+    }
+
+    /// 对单张人脸做 68 点关键点检测（模型未加载或推理失败时返回 `None`）。
+    pub fn detect_landmarks(
+        &mut self,
+        img: &ImageBuf,
+        bbox: [f32; 4],
+    ) -> Option<[[f32; 2]; 68]> {
+        self.landmarker
+            .as_mut()
+            .and_then(|l| l.detect(img, bbox).ok())
     }
 
     /// 由 5 点关键点生成「大眼」液化点（归一化坐标）。

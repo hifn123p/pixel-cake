@@ -1,5 +1,7 @@
-//! 检测算子（人脸检测等，依赖 ONNX 推理）。
+//! 检测算子（依赖 ONNX 推理）。
 //!
-//! 当前落地 SCRFD 人脸检测（磨皮/美型/祛瑕/追色的前置步骤）。
+//! - `face`：SCRFD 人脸检测（bbox + 5 点关键点）
+//! - `landmark`：2DFAN4 68 点关键点（精细美型）
 
 pub mod face;
+pub mod landmark;
