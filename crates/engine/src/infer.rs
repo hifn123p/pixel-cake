@@ -83,7 +83,7 @@ pub fn image_to_nchw(img: &ImageBuf, w: u32, h: u32) -> Result<Array4<f32>, Stri
 }
 
 /// 双线性 resize（保持 RGBA 四通道，色彩空间不变）。
-fn resize_bilinear(src: &ImageBuf, dst_w: u32, dst_h: u32) -> ImageBuf {
+pub fn resize_bilinear(src: &ImageBuf, dst_w: u32, dst_h: u32) -> ImageBuf {
     let mut dst = ImageBuf::new(dst_w, dst_h, src.space);
     if src.width == 0 || src.height == 0 {
         return dst;
