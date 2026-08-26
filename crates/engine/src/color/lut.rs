@@ -43,6 +43,67 @@ impl Lut3D {
         Self { size: n, table }
     }
 
+    /// 从 Adobe `.cube` 3D LUT 文本解析（滤镜库加载）。
+    /// `.cube` 条目按 red 最快排序，此处映射到内部表序（b 最快）。
+    pub fn from_cube(text: &str) -> Result<Self, String> {
+        let mut size = 0u32;
+        let mut entries: Vec<[f32; 3]> = Vec::new();
+
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let mut parts = line.split_whitespace();
+            match parts.next() {
+                Some("LUT_3D_SIZE") => {
+                    size = parts
+                        .next()
+                        .ok_or_else(|| "LUT_3D_SIZE 缺值".to_string())?
+                        .parse()
+                        .map_err(|_| "LUT_3D_SIZE 非数字".to_string())?;
+                }
+                Some("TITLE") | Some("DOMAIN_MIN") | Some("DOMAIN_MAX") | Some("LUT_1D_SIZE") => {
+                    continue;
+                }
+                Some(first) => {
+                    let mut vals = Vec::with_capacity(3);
+                    if let Ok(v) = first.parse::<f32>() {
+                        vals.push(v);
+                    }
+                    for p in parts {
+                        if let Ok(v) = p.parse::<f32>() {
+                            vals.push(v);
+                        }
+                    }
+                    if vals.len() >= 3 {
+                        entries.push([vals[0], vals[1], vals[2]]);
+                    }
+                }
+                None => {}
+            }
+        }
+
+        if size == 0 {
+            return Err("缺少 LUT_3D_SIZE".to_string());
+        }
+        let n = size;
+        let expected = (n * n * n) as usize;
+        if entries.len() < expected {
+            return Err(format!("条目不足: 期望 {expected}，实际 {}", entries.len()));
+        }
+
+        let mut table = vec![[0.0f32; 3]; expected];
+        for (i, e) in entries.iter().take(expected).enumerate() {
+            let r = (i % n as usize) as u32;
+            let g = ((i / n as usize) % n as usize) as u32;
+            let b = (i / (n as usize * n as usize)) as u32;
+            table[((r * n + g) * n + b) as usize] = *e;
+        }
+
+        Ok(Self { size: n, table })
+    }
+
     #[inline]
     fn get(&self, r: u32, g: u32, b: u32) -> [f32; 3] {
         let n = self.size;
@@ -125,5 +186,53 @@ mod tests {
         assert!((out[0] - 0.75).abs() < 1e-3);
         assert!((out[1] - 0.5).abs() < 1e-3);
         assert!((out[2] - 0.25).abs() < 1e-3);
+    }
+
+    #[test]
+    fn cube_identity() {
+        // size=2 的恒等 .cube（条目 red 最快）
+        let text = "\
+LUT_3D_SIZE 2
+0.0 0.0 0.0
+1.0 0.0 0.0
+0.0 1.0 0.0
+1.0 1.0 0.0
+0.0 0.0 1.0
+1.0 0.0 1.0
+0.0 1.0 1.0
+1.0 1.0 1.0
+";
+        let lut = Lut3D::from_cube(text).unwrap();
+        assert_eq!(lut.size, 2);
+        let out = lut.apply([0.5, 0.5, 0.5]);
+        assert!((out[0] - 0.5).abs() < 1e-3);
+        assert!((out[1] - 0.5).abs() < 1e-3);
+        assert!((out[2] - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn cube_with_comments_and_title() {
+        let text = "\
+# 注释行
+TITLE \"test\"
+LUT_3D_SIZE 2
+DOMAIN_MIN 0.0 0.0 0.0
+0.0 0.0 0.0
+1.0 0.0 0.0
+0.0 1.0 0.0
+1.0 1.0 0.0
+0.0 0.0 1.0
+1.0 0.0 1.0
+0.0 1.0 1.0
+1.0 1.0 1.0
+";
+        let lut = Lut3D::from_cube(text).unwrap();
+        assert_eq!(lut.size, 2);
+    }
+
+    #[test]
+    fn cube_missing_size_errors() {
+        let text = "0.0 0.0 0.0\n1.0 1.0 1.0\n";
+        assert!(Lut3D::from_cube(text).is_err());
     }
 }
