@@ -5,6 +5,7 @@
 
 mod commands;
 mod events;
+mod models;
 mod state;
 
 fn main() {
@@ -17,6 +18,8 @@ fn main() {
             commands::save_recipe,
             commands::get_recipe,
             commands::submit_render,
+            models::list_model_packages_cmd,
+            models::download_model_cmd,
         ])
         .setup(|app| {
             state::init(app.handle())?;

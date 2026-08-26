@@ -251,6 +251,30 @@ pub enum ErrorCode {
     InvalidRecipe,
 }
 
+/// 模型资源包清单项（用于「资源包下载」设置，模型文件不入库）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModelSpec {
+    /// 唯一 ID，如 `scrfd_2.5g`。
+    pub id: String,
+    /// 显示名。
+    pub name: String,
+    /// 下载地址（ONNX 文件）。
+    pub url: String,
+    /// 文件大小（字节，用于展示）。
+    pub size_bytes: u64,
+    /// 用途说明。
+    pub purpose: String,
+}
+
+/// 模型资源包下载状态。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum ModelStatus {
+    NotDownloaded,
+    Downloading { progress: f32 },
+    Downloaded { path: String },
+}
+
 impl Recipe {
     /// 序列化为 JSON（存储层直接落 SQLite `recipe.data` 列）。
     pub fn to_json(&self) -> String {

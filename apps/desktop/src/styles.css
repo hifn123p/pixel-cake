@@ -229,3 +229,31 @@ button:disabled {
   color: #04222a;
   font-weight: 600;
 }
+
+/* 资源包下载设置 */
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.model-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.model-ok {
+  color: #3ddc84;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.error-text {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin-bottom: 4px;
+  word-break: break-all;
+}

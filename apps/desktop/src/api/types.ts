@@ -145,3 +145,19 @@ export type EngineEvent =
   | { type: "progress"; photo_id: string; step: PipelineStep; pct: number }
   | { type: "done"; photo_id: string; result_path: string | null; proxy_updated: boolean }
   | { type: "error"; photo_id: string; code: string; message: string };
+
+// 模型资源包（对应 bus::ModelSpec / ModelStatus）
+export interface ModelSpec {
+  id: string;
+  name: string;
+  url: string;
+  size_bytes: number;
+  purpose: string;
+}
+
+export type ModelStatus =
+  | { state: "not_downloaded" }
+  | { state: "downloading"; progress: number }
+  | { state: "downloaded"; path: string };
+
+export type ModelPackage = [ModelSpec, ModelStatus];

@@ -3,6 +3,7 @@ import { api } from "./api/client";
 import { defaultRecipe, type Photo, type Project, type Recipe } from "./api/types";
 import Canvas from "./components/canvas/Canvas";
 import BasePanel from "./components/panels/BasePanel";
+import ModelManager from "./components/panels/ModelManager";
 import NeutralGrayPanel from "./components/panels/NeutralGrayPanel";
 
 export default function App() {
@@ -140,6 +141,8 @@ export default function App() {
         >
           导出（全分辨率）
         </button>
+
+        <ModelManager />
       </aside>
     </div>
   );
