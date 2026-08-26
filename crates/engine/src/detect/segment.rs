@@ -42,6 +42,18 @@ impl SegMask {
     pub fn class_at(&self, x: u32, y: u32) -> u8 {
         self.classes[(y as usize) * (self.width as usize) + (x as usize)]
     }
+
+    /// 把指定类别转成 `ImageBuf` 掩码（命中类别 = 1，其余 = 0），供追色等算子使用。
+    pub fn to_mask(&self, classes: &[u8]) -> ImageBuf {
+        let mut mask = ImageBuf::new(self.width, self.height, ColorSpace::Linear);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let v = if classes.contains(&self.class_at(x, y)) { 1.0 } else { 0.0 };
+                mask.set_pixel(x, y, [v, v, v, 1.0]);
+            }
+        }
+        mask
+    }
 }
 
 /// BiSeNet 人脸解析器。
@@ -201,5 +213,16 @@ mod tests {
         assert_eq!(crop.width, 2);
         assert_eq!(crop.pixel(0, 0), img.pixel(1, 1));
         assert_eq!(crop.pixel(1, 1), img.pixel(2, 2));
+    }
+
+    #[test]
+    fn to_mask_filters_classes() {
+        let mut mask = SegMask::new(2, 2);
+        mask.classes = vec![CLASS_SKIN, CLASS_HAIR, 0, CLASS_SKIN];
+        let skin = mask.to_mask(&[CLASS_SKIN]);
+        assert!((skin.pixel(0, 0)[0] - 1.0).abs() < 1e-6); // 皮肤
+        assert!(skin.pixel(1, 0)[0] < 1e-6); // 头发（非皮肤）
+        assert!(skin.pixel(0, 1)[0] < 1e-6); // 背景
+        assert!((skin.pixel(1, 1)[0] - 1.0).abs() < 1e-6); // 皮肤
     }
 }

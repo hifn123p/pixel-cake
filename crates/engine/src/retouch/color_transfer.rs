@@ -102,6 +102,24 @@ pub fn build_transfer_lut(
     Lut3D::from_fn(size, |rgb| transfer_pixel(rgb, &src, &dst, mode))
 }
 
+/// 分区追色：把 `target` 指定区域的色调迁到 `reference` 对应区域，烘焙 LUT。
+///
+/// `target_mask` / `reference_mask` 为 0..1 权重（>0.5 计入统计），
+/// 由语义分割（如 BiSeNet 皮肤 mask）提供。区域独立统计并迁移，可精确
+/// 控制「只迁皮肤、不动背景/唇色」。
+pub fn build_region_transfer_lut(
+    target: &ImageBuf,
+    target_mask: &ImageBuf,
+    reference: &ImageBuf,
+    reference_mask: &ImageBuf,
+    mode: TransferMode,
+    size: u32,
+) -> Lut3D {
+    let src = masked_stats(target, target_mask);
+    let dst = masked_stats(reference, reference_mask);
+    Lut3D::from_fn(size, |rgb| transfer_pixel(rgb, &src, &dst, mode))
+}
+
 /// 语义分区蒙版（皮肤/头发/唇/背景/天空），权重 0..1。
 /// 语义分割依赖 ONNX 模型（文档 §5.1），此处以结构占位。
 pub struct RegionMask {
@@ -224,5 +242,32 @@ mod tests {
         for i in 0..3 {
             assert!((out[i] - [0.3, 0.6, 0.9][i]).abs() < 1e-2);
         }
+    }
+
+    #[test]
+    fn region_lut_identity_transfer() {
+        // 同图同 mask（全 1）分区迁移应为恒等
+        let a = solid(8, 8, [0.3, 0.6, 0.9]);
+        let mask = solid(8, 8, [1.0, 1.0, 1.0]);
+        let lut = build_region_transfer_lut(&a, &mask, &a, &mask, TransferMode::Extreme, 17);
+        let out = lut.apply([0.3, 0.6, 0.9]);
+        for i in 0..3 {
+            assert!((out[i] - [0.3, 0.6, 0.9][i]).abs() < 1e-2);
+        }
+    }
+
+    #[test]
+    fn region_lut_only_transfers_masked() {
+        // 目标全蓝、参考全红，mask 覆盖全图 → 迁移后应偏红（L 不变，a 增大）
+        let target = solid(8, 8, [0.2, 0.3, 0.8]);
+        let reference = solid(8, 8, [0.8, 0.2, 0.2]);
+        let mask = solid(8, 8, [1.0, 1.0, 1.0]);
+        let lut = build_region_transfer_lut(&target, &mask, &reference, &mask, TransferMode::Extreme, 17);
+        let out = lut.apply([0.2, 0.3, 0.8]);
+        // 蓝 → 红：a 分量显著上升，b 分量下降
+        let src_lab = rgb_to_lab([0.2, 0.3, 0.8]);
+        let out_lab = rgb_to_lab(out);
+        assert!(out_lab[1] > src_lab[1] + 5.0);
+        assert!(out_lab[2] < src_lab[2]);
     }
 }
