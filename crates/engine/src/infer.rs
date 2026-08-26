@@ -14,7 +14,7 @@ use ort::session::Session;
 use ort::value::Tensor;
 use ort::{ep, inputs};
 
-use crate::image::{linear_to_srgb, ColorSpace, ImageBuf};
+use crate::image::{linear_to_srgb, ImageBuf};
 
 /// 推理会话：持有 ONNX Runtime Session（注册 CUDA 执行提供者）。
 pub struct InferSession {
@@ -41,7 +41,7 @@ impl InferSession {
     /// 输出按 `output_names` 顺序返回，每个元素为 `(维度列表, 行优先展平的 f32)`，
     /// 由调用方按模型约定做后处理（解码 bbox / 关键点 / 蒙版等）。
     pub fn run(
-        &self,
+        &mut self,
         input_name: &str,
         tensor: Tensor<f32>,
         output_names: &[&str],
@@ -123,6 +123,7 @@ pub fn resize_bilinear(src: &ImageBuf, dst_w: u32, dst_h: u32) -> ImageBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::image::ColorSpace;
 
     #[test]
     fn resize_identity_keeps_pixels() {

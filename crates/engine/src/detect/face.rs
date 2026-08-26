@@ -49,7 +49,7 @@ impl FaceDetector {
     }
 
     /// 检测图像中的所有人脸。
-    pub fn detect(&self, img: &ImageBuf) -> Result<Vec<DetectedFace>, String> {
+    pub fn detect(&mut self, img: &ImageBuf) -> Result<Vec<DetectedFace>, String> {
         let size = self.input_size;
         let tensor = scrfd_preprocess(img, size)?;
 
