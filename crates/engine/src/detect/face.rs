@@ -8,7 +8,7 @@
 //! 标准约定，实际运行需模型文件就位后验证微调。
 
 use ndarray::Array4;
-use ort::Tensor;
+use ort::value::Tensor;
 
 use crate::image::{linear_to_srgb, ImageBuf};
 use crate::infer::{resize_bilinear, InferSession};

@@ -11,7 +11,8 @@
 
 use ndarray::Array4;
 use ort::session::Session;
-use ort::{ep, inputs, Tensor};
+use ort::value::Tensor;
+use ort::{ep, inputs};
 
 use crate::image::{linear_to_srgb, ColorSpace, ImageBuf};
 
