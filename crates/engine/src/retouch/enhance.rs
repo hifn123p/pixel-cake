@@ -60,7 +60,7 @@ impl Enhancer {
         let (_shape, data) = &outputs[0]; // [1, 3, 512, 512]
 
         // 4. 后处理 → 线性 RGB 512 图像
-        let enhanced_512 = enhance_postprocess(data);
+        let enhanced_512 = enhance_postprocess(data, MODEL_SIZE, MODEL_SIZE);
 
         // 5. resize 回 crop 尺寸
         let enhanced_crop = resize_bilinear(&enhanced_512, crop_w, crop_h);
@@ -116,13 +116,13 @@ fn enhance_preprocess(img: &ImageBuf) -> Result<Tensor<f32>, String> {
 }
 
 /// GPEN 后处理：`(x+1)/2` 回 [0,1] sRGB → 线性 RGB。
-fn enhance_postprocess(data: &[f32]) -> ImageBuf {
-    let mut img = ImageBuf::new(MODEL_SIZE, MODEL_SIZE, ColorSpace::Linear);
-    for y in 0..MODEL_SIZE {
-        for x in 0..MODEL_SIZE {
+fn enhance_postprocess(data: &[f32], h: u32, w: u32) -> ImageBuf {
+    let mut img = ImageBuf::new(w, h, ColorSpace::Linear);
+    for y in 0..h {
+        for x in 0..w {
             let mut rgb = [0.0f32; 3];
             for c in 0..3 {
-                let v = data[(c * MODEL_SIZE as usize + y as usize) * MODEL_SIZE as usize + x as usize];
+                let v = data[(c * h as usize + y as usize) * w as usize + x as usize];
                 let srgb = (v.clamp(-1.0, 1.0) + 1.0) / 2.0;
                 rgb[c] = srgb_to_linear(srgb);
             }
@@ -140,7 +140,7 @@ mod tests {
     fn postprocess_maps_range() {
         // 输入 -1 → 0（黑），+1 → 1（白），0 → 0.5 灰度
         let data = [-1.0f32, 0.0, 1.0];
-        let img = enhance_postprocess(&data);
+        let img = enhance_postprocess(&data, 1, 1);
         assert!(img.pixel(0, 0)[0] < 1e-4); // -1 → 黑
         assert!(img.pixel(0, 0)[1] < 1e-4);
         assert!(img.pixel(0, 0)[2] < 1e-4);
