@@ -51,8 +51,6 @@ pub struct Segmenter {
 
 /// BiSeNet 输入尺寸。
 const MODEL_SIZE: u32 = 512;
-/// 类别数。
-const NUM_CLASSES: usize = 19;
 
 impl Segmenter {
     /// 从 `.onnx` 模型文件创建解析器（CUDA EP）。
@@ -137,12 +135,13 @@ fn segment_preprocess(img: &ImageBuf) -> Result<Tensor<f32>, String> {
 
 /// argmax 得类别 mask（输入 `[1, C, H, W]` 展平，行优先）。
 fn argmax_mask(data: &[f32], h: usize, w: usize) -> Vec<u8> {
+    let num_classes = data.len() / (h * w);
     let mut mask = vec![0u8; h * w];
     for y in 0..h {
         for x in 0..w {
             let mut best = 0u8;
             let mut best_v = f32::MIN;
-            for c in 0..NUM_CLASSES {
+            for c in 0..num_classes {
                 let v = data[(c * h + y) * w + x];
                 if v > best_v {
                     best_v = v;
