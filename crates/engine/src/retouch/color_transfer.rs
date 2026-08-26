@@ -264,10 +264,10 @@ mod tests {
         let mask = solid(8, 8, [1.0, 1.0, 1.0]);
         let lut = build_region_transfer_lut(&target, &mask, &reference, &mask, TransferMode::Extreme, 17);
         let out = lut.apply([0.2, 0.3, 0.8]);
-        // 蓝 → 红：a 分量显著上升，b 分量下降
+        // 蓝 → 红：a 分量显著上升（绿→红），b 分量上升（蓝负→红正）
         let src_lab = rgb_to_lab([0.2, 0.3, 0.8]);
         let out_lab = rgb_to_lab(out);
         assert!(out_lab[1] > src_lab[1] + 5.0);
-        assert!(out_lab[2] < src_lab[2]);
+        assert!(out_lab[2] > src_lab[2]);
     }
 }
