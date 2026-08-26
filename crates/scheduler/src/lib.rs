@@ -4,10 +4,12 @@
 //! （`GpuBudget`，文档 §5.3 的 8GB 上限约束）。UI 提交 `EngineRequest`，
 //! 引擎按显存预算串行/有限并行执行，进度经 `EngineEvent` 回流前端。
 
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
+use engine::ai::RetouchEngine;
 use engine::base::tone::{CurvePoint, ToneParams};
 use engine::export::encode_tiff;
 use engine::image::{ColorSpace, ImageBuf};
@@ -75,20 +77,24 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new() -> Self {
-        Self::with_budget(VRAM_8GB)
+    /// 创建调度器；`models_dir` 为模型目录（缺失模型则 AI 功能降级）。
+    pub fn new(models_dir: impl AsRef<Path>) -> Self {
+        Self::with_budget(VRAM_8GB, models_dir)
     }
 
-    pub fn with_budget(total_bytes: usize) -> Self {
+    pub fn with_budget(total_bytes: usize, models_dir: impl AsRef<Path>) -> Self {
         let (tx_req, mut rx_req) = mpsc::channel::<EngineRequest>(256);
         let (tx_evt, _) = broadcast::channel::<EngineEvent>(64);
         let budget = GpuBudget::new(total_bytes);
 
+        let models_dir = models_dir.as_ref().to_path_buf();
         let evt = tx_evt.clone();
         let bgt = budget.clone();
         tokio::spawn(async move {
+            // AI 门面在工作线程内创建一次，跨请求复用（模型加载开销仅在首次）。
+            let engine = Arc::new(Mutex::new(RetouchEngine::new(&models_dir)));
             while let Some(req) = rx_req.recv().await {
-                run_one(&evt, &bgt, req).await;
+                run_one(&evt, &bgt, &engine, req).await;
             }
         });
 
@@ -121,7 +127,12 @@ impl Default for Scheduler {
 }
 
 /// 单条请求的处理：按显存预算串行，解码 → 管线 → 导出，发进度与完成事件。
-async fn run_one(evt: &broadcast::Sender<EngineEvent>, budget: &GpuBudget, req: EngineRequest) {
+async fn run_one(
+    evt: &broadcast::Sender<EngineEvent>,
+    budget: &GpuBudget,
+    engine: &Arc<Mutex<RetouchEngine>>,
+    req: EngineRequest,
+) {
     let photo_id = req.photo_id.clone();
 
     // 显存预算：占位估算（后续由 engine 各算子 OpCost 驱动）。
@@ -142,7 +153,7 @@ async fn run_one(evt: &broadcast::Sender<EngineEvent>, budget: &GpuBudget, req: 
     });
 
     // 解码 + 处理 + 导出（同步，M1 骨架；后续改用 spawn_blocking 承接 CPU 密集）。
-    let result = process_request(&req);
+    let result = process_request(&req, engine);
 
     budget.release(est_vram);
 
@@ -169,20 +180,29 @@ async fn run_one(evt: &broadcast::Sender<EngineEvent>, budget: &GpuBudget, req: 
     }
 }
 
-/// 执行一次重算：解码输入 → Recipe 转管线 → 16bit 处理 → TIFF 导出。
+/// 执行一次重算：解码输入 → AI 检测 → Recipe 转管线 → 16bit 处理 → TIFF 导出。
 /// 返回导出文件路径。
-fn process_request(req: &EngineRequest) -> Result<String, String> {
+fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> Result<String, String> {
     // 1. 读文件 + 解码（PPM 占位；LibRaw 接入后按扩展名分发）
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
     let img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
 
     // 2. Recipe → Pipeline
-    let pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
+    let mut pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
 
-    // 3. 16bit 全链路处理
+    // 3. AI：检测人脸 → 自动美型液化点（模型缺失时降级为仅手动控制点）
+    {
+        let mut eng = engine.lock().expect("engine mutex poisoned");
+        if let Some(faces) = eng.detect_faces(&img) {
+            let pts = RetouchEngine::auto_beauty_points(&faces, img.width, img.height);
+            pipeline.beauty_points.extend(pts);
+        }
+    }
+
+    // 4. 16bit 全链路处理
     let result = process(&img, &pipeline);
 
-    // 4. 导出 16bit TIFF
+    // 5. 导出 16bit TIFF
     let tiff = encode_tiff(&result);
     let out_path = format!("{}.out.tiff", req.raw_path);
     std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;

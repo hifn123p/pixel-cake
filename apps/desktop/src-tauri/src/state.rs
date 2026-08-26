@@ -17,7 +17,7 @@ pub fn init(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let db = dir.join("pixcake.db");
 
     let store = Store::open(&db)?;
-    let scheduler = Scheduler::new();
+    let scheduler = Scheduler::new(dir.join("models"));
 
     // 先取出事件接收端再 move 调度器进状态，避免借用冲突。
     crate::events::spawn_forwarder(app.clone(), scheduler.subscribe());
