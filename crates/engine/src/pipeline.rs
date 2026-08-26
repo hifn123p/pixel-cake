@@ -72,7 +72,7 @@ pub fn process(src: &ImageBuf, p: &Pipeline) -> ImageBuf {
 
     // 5. 基础调色
     if p.tone != ToneParams::default() {
-        let op = ToneAdjust::new(p.tone);
+        let op = ToneAdjust::new(p.tone.clone());
         let mut next = ImageBuf::new(src.width, src.height, src.space);
         op.apply(&img, &mut next);
         img = next;

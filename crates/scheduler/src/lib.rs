@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
-use engine::base::tone::ToneParams;
+use engine::base::tone::{CurvePoint, ToneParams};
 use engine::export::encode_tiff;
 use engine::pipeline::{process, Pipeline};
 use engine::raw::decode_ppm;
@@ -201,6 +201,14 @@ fn recipe_to_pipeline(recipe: &bus::Recipe) -> Pipeline {
         saturation: recipe.base.hsl.saturation,
         temperature: recipe.base.temperature,
         tint: recipe.base.tint,
+        curves: recipe
+            .base
+            .curves
+            .iter()
+            .map(|pt| CurvePoint { x: pt.x, y: pt.y })
+            .collect(),
+        grain: recipe.base.grain,
+        vignette: recipe.base.vignette,
     };
 
     // 美型：用户手动拖拽控制点可直接映射为液化点
