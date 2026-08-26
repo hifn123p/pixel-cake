@@ -218,7 +218,7 @@ mod tests {
             landmarks: [[0.0; 2]; 5],
         };
         let f2 = DetectedFace {
-            bbox: [0.5, 0.5, 2.5, 2.5],
+            bbox: [0.0, 0.0, 1.8, 1.8],
             score: 0.6,
             landmarks: [[0.0; 2]; 5],
         };
