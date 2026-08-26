@@ -4,12 +4,14 @@
 //! 清单硬编码在此，URL 使用 Hugging Face 镜像 hf-mirror.com（国内可达）。
 
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use bus::{ModelSpec, ModelStatus};
 use tauri::{AppHandle, Manager};
 
 /// 模型资源包清单（开源小模型，ONNX 格式，来源 FaceFusion 模型仓库）。
-pub const MODEL_PACKAGES: &[ModelSpec] = &[
+pub static MODEL_PACKAGES: LazyLock<Vec<ModelSpec>> = LazyLock::new(|| {
+    vec![
     ModelSpec {
         id: "scrfd_2.5g".into(),
         name: "人脸检测 SCRFD 2.5G".into(),
@@ -38,7 +40,8 @@ pub const MODEL_PACKAGES: &[ModelSpec] = &[
         size_bytes: 280_000_000,
         purpose: "磨皮（皮肤平滑/增强）".into(),
     },
-];
+    ]
+});
 
 /// 模型目录：`app_data_dir/models`。
 pub fn models_dir(app: &AppHandle) -> Result<PathBuf, String> {
