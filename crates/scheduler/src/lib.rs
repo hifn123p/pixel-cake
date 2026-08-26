@@ -10,9 +10,11 @@ use std::sync::Arc;
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
 use engine::base::tone::{CurvePoint, ToneParams};
 use engine::export::encode_tiff;
+use engine::image::{ColorSpace, ImageBuf};
 use engine::pipeline::{process, Pipeline};
 use engine::raw::decode_ppm;
 use engine::retouch::beauty::LiquifyPoint;
+use engine::retouch::inpaint::{merge_mask, polygon_to_mask};
 use tokio::sync::{broadcast, mpsc};
 
 /// RTX 3070 显存预算：8GB（文档 §5.3）。
@@ -175,7 +177,7 @@ fn process_request(req: &EngineRequest) -> Result<String, String> {
     let img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
 
     // 2. Recipe → Pipeline
-    let pipeline = recipe_to_pipeline(&req.recipe);
+    let pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
 
     // 3. 16bit 全链路处理
     let result = process(&img, &pipeline);
@@ -189,9 +191,9 @@ fn process_request(req: &EngineRequest) -> Result<String, String> {
 }
 
 /// 把 `bus::Recipe` 映射为引擎管线参数。
-/// AI 依赖的部分（磨皮蒙版/追色 LUT/祛瑕 mask/滤镜 LUT）需模型与资源加载，
-/// 当前留空占位，待接入后填充。
-fn recipe_to_pipeline(recipe: &bus::Recipe) -> Pipeline {
+/// AI 依赖的部分（磨皮蒙版/追色 LUT/滤镜 LUT）需模型与资源加载，
+/// 当前留空占位；祛瑕多边形栅格化已落地。
+fn recipe_to_pipeline(recipe: &bus::Recipe, w: u32, h: u32) -> Pipeline {
     let mut p = Pipeline::default();
 
     // 基础调色（纯参数，直接映射）
@@ -227,10 +229,24 @@ fn recipe_to_pipeline(recipe: &bus::Recipe) -> Pipeline {
             .collect();
     }
 
+    // 祛瑕：多边形栅格化为 mask（多区域合并）
+    if !recipe.inpaint.is_empty() {
+        let mut mask = ImageBuf::new(w, h, ColorSpace::Linear);
+        for region in &recipe.inpaint {
+            let poly: Vec<[f32; 2]> = region
+                .polygon
+                .iter()
+                .map(|pt| [pt.x, pt.y])
+                .collect();
+            let m = polygon_to_mask(w, h, &poly);
+            merge_mask(&mut mask, &m);
+        }
+        p.inpaint_mask = Some(mask);
+    }
+
     // TODO(engine): 以下依赖 AI 模型 / 资源加载，接入后填充：
     // - neutral_gray：GAN 预测平整/立体蒙版 → Pipeline::neutral_gray
     // - color：语义分割 + Lab 迁移烘焙 → Pipeline::color_lut
-    // - inpaint：多边形栅格化为 mask → Pipeline::inpaint_mask
     // - filter：按 lut_id 加载 .cube → Pipeline::filter_lut
 
     p
