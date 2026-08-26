@@ -74,8 +74,15 @@ pub async fn submit_render(
         "export" => Scope::Export,
         _ => Scope::Preview,
     };
+    // 查原图路径（引擎据此解码输入）
+    let photo = state
+        .store
+        .get_photo(&photo_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "照片不存在".to_string())?;
     let req = EngineRequest {
         photo_id,
+        raw_path: photo.raw_path,
         recipe,
         scope,
     };

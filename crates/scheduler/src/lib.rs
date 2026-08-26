@@ -8,6 +8,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
+use engine::base::tone::ToneParams;
+use engine::export::encode_tiff;
+use engine::pipeline::{process, Pipeline};
+use engine::raw::decode_ppm;
+use engine::retouch::beauty::LiquifyPoint;
 use tokio::sync::{broadcast, mpsc};
 
 /// RTX 3070 显存预算：8GB（文档 §5.3）。
@@ -113,17 +118,13 @@ impl Default for Scheduler {
     }
 }
 
-/// 单条请求的处理：按显存预算串行，发进度与完成事件。
-///
-/// 当前为 M1 骨架占位——真实推理在 `engine` crate 接入后替换
-/// `// TODO(engine)` 处的调用，预算由各算子的 `OpCost::vram_bytes` 驱动。
+/// 单条请求的处理：按显存预算串行，解码 → 管线 → 导出，发进度与完成事件。
 async fn run_one(evt: &broadcast::Sender<EngineEvent>, budget: &GpuBudget, req: EngineRequest) {
     let photo_id = req.photo_id.clone();
 
-    // 占位：估算本次重算峰值显存（后续由 engine 算子 cost 计算）。
+    // 显存预算：占位估算（后续由 engine 各算子 OpCost 驱动）。
     let est_vram = 512 * 512 * 4 * 4;
     if !budget.try_acquire(est_vram) {
-        // 显存不足 → 等待（简化：直接发错误；真实实现应入队等待）。
         let _ = evt.send(EngineEvent::Error {
             photo_id: photo_id.clone(),
             code: bus::ErrorCode::OutOfMemory,
@@ -132,38 +133,97 @@ async fn run_one(evt: &broadcast::Sender<EngineEvent>, budget: &GpuBudget, req: 
         return;
     }
 
-    let steps = match req.scope {
-        Scope::Preview => {
-            // 代理图只跑轻算子链，不经 AI 推理。
-            vec![PipelineStep::BaseTone, PipelineStep::Filter, PipelineStep::Encode]
-        }
-        Scope::Export => vec![
-            PipelineStep::RawDecode,
-            PipelineStep::NeutralGray,
-            PipelineStep::BeautyWarp,
-            PipelineStep::Inpaint,
-            PipelineStep::ColorLut,
-            PipelineStep::BaseTone,
-            PipelineStep::Filter,
-            PipelineStep::Encode,
-        ],
-    };
+    let _ = evt.send(EngineEvent::Progress {
+        photo_id: photo_id.clone(),
+        step: PipelineStep::RawDecode,
+        pct: 0.0,
+    });
 
-    let total = steps.len() as f32;
-    for (i, step) in steps.into_iter().enumerate() {
-        let pct = (i as f32 / total) * 100.0;
-        // TODO(engine): 此处调用 engine 管线的对应算子。
-        let _ = evt.send(EngineEvent::Progress {
-            photo_id: photo_id.clone(),
-            step,
-            pct,
-        });
-    }
+    // 解码 + 处理 + 导出（同步，M1 骨架；后续改用 spawn_blocking 承接 CPU 密集）。
+    let result = process_request(&req);
 
     budget.release(est_vram);
-    let _ = evt.send(EngineEvent::Done {
-        photo_id,
-        result_path: None, // TODO(engine): 由导出模块写入
-        proxy_updated: req.scope == Scope::Preview,
-    });
+
+    match result {
+        Ok(out_path) => {
+            let _ = evt.send(EngineEvent::Progress {
+                photo_id: photo_id.clone(),
+                step: PipelineStep::Encode,
+                pct: 100.0,
+            });
+            let _ = evt.send(EngineEvent::Done {
+                photo_id,
+                result_path: Some(out_path),
+                proxy_updated: req.scope == Scope::Preview,
+            });
+        }
+        Err(message) => {
+            let _ = evt.send(EngineEvent::Error {
+                photo_id,
+                code: bus::ErrorCode::Decode,
+                message,
+            });
+        }
+    }
+}
+
+/// 执行一次重算：解码输入 → Recipe 转管线 → 16bit 处理 → TIFF 导出。
+/// 返回导出文件路径。
+fn process_request(req: &EngineRequest) -> Result<String, String> {
+    // 1. 读文件 + 解码（PPM 占位；LibRaw 接入后按扩展名分发）
+    let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
+    let img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
+
+    // 2. Recipe → Pipeline
+    let pipeline = recipe_to_pipeline(&req.recipe);
+
+    // 3. 16bit 全链路处理
+    let result = process(&img, &pipeline);
+
+    // 4. 导出 16bit TIFF
+    let tiff = encode_tiff(&result);
+    let out_path = format!("{}.out.tiff", req.raw_path);
+    std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
+
+    Ok(out_path)
+}
+
+/// 把 `bus::Recipe` 映射为引擎管线参数。
+/// AI 依赖的部分（磨皮蒙版/追色 LUT/祛瑕 mask/滤镜 LUT）需模型与资源加载，
+/// 当前留空占位，待接入后填充。
+fn recipe_to_pipeline(recipe: &bus::Recipe) -> Pipeline {
+    let mut p = Pipeline::default();
+
+    // 基础调色（纯参数，直接映射）
+    p.tone = ToneParams {
+        exposure: recipe.base.exposure,
+        contrast: recipe.base.contrast,
+        saturation: recipe.base.hsl.saturation,
+        temperature: recipe.base.temperature,
+        tint: recipe.base.tint,
+    };
+
+    // 美型：用户手动拖拽控制点可直接映射为液化点
+    if recipe.beauty.enabled {
+        p.beauty_points = recipe
+            .beauty
+            .manual_points
+            .iter()
+            .map(|cp| LiquifyPoint {
+                x: cp.x,
+                y: cp.y,
+                dx: cp.dx,
+                dy: cp.dy,
+                radius: 0.12,
+            })
+            .collect();
+    }
+
+    // TODO(engine): 以下依赖 AI 模型 / 资源加载，接入后填充：
+    // - neutral_gray：GAN 预测平整/立体蒙版 → Pipeline::neutral_gray
+    // - color：语义分割 + Lab 迁移烘焙 → Pipeline::color_lut
+    // - inpaint：多边形栅格化为 mask → Pipeline::inpaint_mask
+    // - filter：按 lut_id 加载 .cube → Pipeline::filter_lut
+
+    p
 }

@@ -199,6 +199,8 @@ pub enum Scope {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EngineRequest {
     pub photo_id: String,
+    /// 原始文件路径（RAW/JPEG/代理图），引擎据此解码输入。
+    pub raw_path: String,
     pub recipe: Recipe,
     pub scope: Scope,
 }

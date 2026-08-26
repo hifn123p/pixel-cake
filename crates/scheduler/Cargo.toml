@@ -5,5 +5,6 @@ edition.workspace = true
 
 [dependencies]
 bus = { path = "../bus" }
+engine = { path = "../engine" }
 tokio.workspace = true
 thiserror.workspace = true

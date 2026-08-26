@@ -196,6 +196,19 @@ impl Store {
         rows.collect::<SqlResult<Vec<_>>>().map_err(Into::into)
     }
 
+    pub fn get_photo(&self, photo_id: &str) -> Result<Option<Photo>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, raw_path, proxy_path, result_path, width, height, status, created_at FROM photo WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query(params![photo_id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(row_to_photo(row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn update_photo_status(&self, photo_id: &str, status: PhotoStatus) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
