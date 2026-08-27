@@ -14,7 +14,7 @@ use engine::base::tone::{CurvePoint, ToneParams};
 use engine::export::encode_tiff;
 use engine::image::{ColorSpace, ImageBuf};
 use engine::pipeline::{process, Pipeline};
-use engine::raw::decode_ppm;
+use engine::raw::decode_auto;
 use engine::retouch::beauty::LiquifyPoint;
 use engine::retouch::inpaint::{merge_mask, polygon_to_mask};
 use tokio::sync::{broadcast, mpsc};
@@ -184,9 +184,9 @@ async fn run_one(
 /// 执行一次重算：解码输入 → AI 检测 → Recipe 转管线 → 16bit 处理 → TIFF 导出。
 /// 返回导出文件路径。
 fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> Result<String, String> {
-    // 1. 读文件 + 解码（PPM 占位；LibRaw 接入后按扩展名分发）
+    // 1. 读文件 + 解码（按扩展名分发：PPM / LibRaw）
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
-    let mut img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
+    let mut img = decode_auto(&req.raw_path, &bytes).map_err(|e| format!("解码失败: {e}"))?;
 
     // 2. Recipe → Pipeline
     let mut pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);

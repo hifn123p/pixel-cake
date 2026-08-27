@@ -44,7 +44,7 @@ impl RawDecoder for PpmDecoder {
 /// LibRaw FFI 解码器（CR2/ARW/NEF/DNG 等相机 RAW）。
 ///
 /// 经 `libraw-rs`（vendored 静态编译 LibRaw）解码 + dcraw 处理为 16bit RGB。
-/// dcraw 输出为 sRGB（带 gamma），此处先直存，后续在 image 层统一转线性。
+/// dcraw 输出为 sRGB（带 gamma），此处转线性，与 PPM 路径保持一致。
 pub struct LibRawDecoder;
 
 impl RawDecoder for LibRawDecoder {
@@ -65,14 +65,33 @@ impl RawDecoder for LibRawDecoder {
                     return Err(DecodeError::Truncated);
                 }
                 let c = [
-                    data[idx] as f32 / 65535.0,
-                    data[idx + 1] as f32 / 65535.0,
-                    data[idx + 2] as f32 / 65535.0,
+                    srgb_to_linear(data[idx] as f32 / 65535.0),
+                    srgb_to_linear(data[idx + 1] as f32 / 65535.0),
+                    srgb_to_linear(data[idx + 2] as f32 / 65535.0),
                 ];
                 img.set_pixel(x, y, [c[0], c[1], c[2], 1.0]);
             }
         }
         Ok(img)
+    }
+}
+
+/// 根据文件扩展名自动选择解码器（PPM / LibRaw）。
+///
+/// 支持的 RAW 扩展名：cr2/cr3/arw/nef/dng/raf/orf/rw2/pef/srw。
+/// 其他格式（如 jpeg/png）暂不支持，返回 [`DecodeError::UnsupportedFormat`]。
+pub fn decode_auto(path: &str, bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    match ext.as_str() {
+        "ppm" | "pnm" => PpmDecoder.decode(bytes),
+        "cr2" | "cr3" | "arw" | "nef" | "dng" | "raf" | "orf" | "rw2" | "pef" | "srw" => {
+            LibRawDecoder.decode(bytes)
+        }
+        _ => Err(DecodeError::UnsupportedFormat),
     }
 }
 
@@ -187,5 +206,23 @@ mod tests {
     fn truncated_data() {
         let bytes = b"P6\n4 4\n255\n123"; // 数据不足
         assert!(decode_ppm(bytes).is_err());
+    }
+
+    #[test]
+    fn decode_auto_dispatches_by_extension() {
+        // .ppm → PPM 解码
+        let bytes = ppm_8bit(2, 2, [128, 64, 32]);
+        let img = decode_auto("photo.ppm", &bytes).unwrap();
+        assert_eq!((img.width, img.height), (2, 2));
+
+        // 未知扩展名 → 不支持
+        assert!(matches!(
+            decode_auto("photo.jpg", &bytes),
+            Err(DecodeError::UnsupportedFormat)
+        ));
+        assert!(matches!(
+            decode_auto("photo.xyz", &bytes),
+            Err(DecodeError::UnsupportedFormat)
+        ));
     }
 }
