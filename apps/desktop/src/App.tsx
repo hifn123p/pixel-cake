@@ -4,6 +4,7 @@ import { defaultRecipe, type Photo, type Project, type Recipe } from "./api/type
 import Canvas from "./components/canvas/Canvas";
 import BasePanel from "./components/panels/BasePanel";
 import BeautyPanel from "./components/panels/BeautyPanel";
+import ColorPanel from "./components/panels/ColorPanel";
 import ModelManager from "./components/panels/ModelManager";
 import NeutralGrayPanel from "./components/panels/NeutralGrayPanel";
 
@@ -134,6 +135,10 @@ export default function App() {
         <BeautyPanel
           value={recipe.beauty}
           onChange={(v) => updateRecipe({ ...recipe, beauty: v })}
+        />
+        <ColorPanel
+          value={recipe.color}
+          onChange={(v) => updateRecipe({ ...recipe, color: v })}
         />
         <BasePanel
           value={recipe.base}
