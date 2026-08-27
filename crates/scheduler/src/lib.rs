@@ -11,11 +11,13 @@ use std::sync::{Arc, Mutex};
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
 use engine::ai::RetouchEngine;
 use engine::base::tone::{CurvePoint, ToneParams};
+use engine::detect::segment::CLASS_SKIN;
 use engine::export::encode_tiff;
 use engine::image::{ColorSpace, ImageBuf};
 use engine::pipeline::{process, Pipeline};
 use engine::raw::decode_auto;
 use engine::retouch::beauty::LiquifyPoint;
+use engine::retouch::color_transfer::{build_region_transfer_lut, TransferMode};
 use engine::retouch::inpaint::{merge_mask, polygon_to_mask};
 use tokio::sync::{broadcast, mpsc};
 
@@ -217,6 +219,46 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
                 for f in &faces {
                     if let Some(enhanced) = eng.enhance_face(&img, f.bbox, blend) {
                         img = enhanced;
+                    }
+                }
+            }
+
+            // 3c. 追色：参考图皮肤色调 → 烘焙分区迁移 LUT（单脸）
+            if req.recipe.color.enabled {
+                if let Some(ref_path) = req.recipe.color.reference_path.as_ref() {
+                    if let Some(target_bbox) = faces.first().map(|f| f.bbox) {
+                        if let Ok(ref_bytes) = std::fs::read(ref_path) {
+                            if let Ok(reference) = decode_auto(ref_path, &ref_bytes) {
+                                if let Some(ref_faces) = eng.detect_faces(&reference) {
+                                    if let Some(ref_bbox) = ref_faces.first().map(|f| f.bbox) {
+                                        let target_mask = eng
+                                            .segment_face(&img, target_bbox)
+                                            .map(|m| m.to_mask(&[CLASS_SKIN]));
+                                        let ref_mask = eng
+                                            .segment_face(&reference, ref_bbox)
+                                            .map(|m| m.to_mask(&[CLASS_SKIN]));
+                                        if let (Some(tm), Some(rm)) = (target_mask, ref_mask) {
+                                            let mode = match req.recipe.color.mode {
+                                                bus::ColorTransferMode::Extreme => {
+                                                    TransferMode::Extreme
+                                                }
+                                                bus::ColorTransferMode::Harmony => {
+                                                    TransferMode::Harmony
+                                                }
+                                            };
+                                            pipeline.color_lut = Some(build_region_transfer_lut(
+                                                &img,
+                                                &tm,
+                                                &reference,
+                                                &rm,
+                                                mode,
+                                                33,
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

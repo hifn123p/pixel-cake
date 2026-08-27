@@ -42,6 +42,7 @@ export type ColorTransferMode = "Extreme" | "Harmony";
 export interface Color {
   enabled: boolean;
   lut_ref: string | null;
+  reference_path: string | null;
   per_region_strength: number;
   mode: ColorTransferMode;
 }
@@ -92,6 +93,7 @@ export function defaultRecipe(): Recipe {
     color: {
       enabled: false,
       lut_ref: null,
+      reference_path: null,
       per_region_strength: 1,
       mode: "Harmony",
     },

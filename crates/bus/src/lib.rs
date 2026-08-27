@@ -84,6 +84,8 @@ pub struct Color {
     pub enabled: bool,
     /// 烘焙后的 3D LUT 引用（存储在本地目录，此处存路径/ID）。
     pub lut_ref: Option<String>,
+    /// 参考样片路径（追色目标色调来源；现场烘焙用，可空）。
+    pub reference_path: Option<String>,
     /// 分区独立追色强度 0–1。
     pub per_region_strength: f32,
     /// 追色模式。
@@ -166,6 +168,7 @@ impl Default for Recipe {
             color: Color {
                 enabled: false,
                 lut_ref: None,
+                reference_path: None,
                 per_region_strength: 1.0,
                 mode: ColorTransferMode::Harmony,
             },
