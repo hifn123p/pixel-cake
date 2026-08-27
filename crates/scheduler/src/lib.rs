@@ -186,15 +186,16 @@ async fn run_one(
 fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> Result<String, String> {
     // 1. 读文件 + 解码（PPM 占位；LibRaw 接入后按扩展名分发）
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
-    let img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
+    let mut img = decode_ppm(&bytes).map_err(|e| format!("解码失败: {e}"))?;
 
     // 2. Recipe → Pipeline
     let mut pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
 
-    // 3. AI：检测人脸 → 精细美型（68 点瘦脸/大眼），关键点模型缺失时回退 5 点大眼
+    // 3. AI：检测人脸 → 美型液化点（原图关键点）+ 磨皮（GPEN 替换 img）
     {
         let mut eng = engine.lock().expect("engine mutex poisoned");
         if let Some(faces) = eng.detect_faces(&img) {
+            // 3a. 美型：68 点瘦脸/大眼（基于原图关键点），关键点模型缺失时回退 5 点大眼
             let mut beauty = Vec::new();
             for f in &faces {
                 if let Some(lm) = eng.detect_landmarks(&img, f.bbox) {
@@ -209,6 +210,16 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
                 beauty = RetouchEngine::auto_beauty_points(&faces, img.width, img.height);
             }
             pipeline.beauty_points.extend(beauty);
+
+            // 3b. 磨皮：GPEN 皮肤增强（blend 强度 = ka/100）
+            if req.recipe.neutral_gray.enabled && req.recipe.neutral_gray.ka > 0 {
+                let blend = req.recipe.neutral_gray.ka as f32 / 100.0;
+                for f in &faces {
+                    if let Some(enhanced) = eng.enhance_face(&img, f.bbox, blend) {
+                        img = enhanced;
+                    }
+                }
+            }
         }
     }
 
