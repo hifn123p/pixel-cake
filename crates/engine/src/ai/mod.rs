@@ -186,14 +186,21 @@ impl RetouchEngine {
 
     /// 由 68 点关键点生成「瘦脸 + 大眼」液化点（归一化坐标）。
     ///
-    /// - 瘦脸：下颌轮廓点（索引 3..=13）朝脸部中心（鼻尖 33）向内推；
+    /// - 瘦脸：下颌轮廓点（索引 3..=13）朝脸部中心（鼻尖 33）向内推，
+    ///   强度随 `face_slim`（0..100，50 为基准）缩放；
     /// - 大眼：双眼轮廓点（36..=41 / 42..=47）从眼中心向外推。
     ///
     /// 68 点顺序为 dlib/FAN 标准（0-16 轮廓、17-26 眉、27-35 鼻、36-47 眼、48-67 嘴）。
-    pub fn face_beauty_points(landmarks: &[[f32; 2]; 68], w: u32, h: u32) -> Vec<LiquifyPoint> {
+    pub fn face_beauty_points(
+        landmarks: &[[f32; 2]; 68],
+        w: u32,
+        h: u32,
+        face_slim: f32,
+    ) -> Vec<LiquifyPoint> {
         let wf = w.max(1) as f32;
         let hf = h.max(1) as f32;
         let mut pts = Vec::new();
+        let slim = face_slim.clamp(0.0, 100.0) / 50.0; // 50 → 基准强度
 
         // 脸部中心：鼻尖（索引 33）
         let (cx, cy) = (landmarks[33][0], landmarks[33][1]);
@@ -204,7 +211,7 @@ impl RetouchEngine {
             let vx = px - cx;
             let vy = py - cy;
             let dist = (vx * vx + vy * vy).sqrt().max(1.0);
-            let k = dist * 0.02; // 推拉强度随距中心距离增大
+            let k = dist * 0.02 * slim; // 推拉强度随距中心距离与瘦脸参数缩放
             pts.push(LiquifyPoint {
                 x: px / wf,
                 y: py / hf,
@@ -289,7 +296,7 @@ mod tests {
             lm[i] = [60.0 + (i as f32 - 42.0) * 2.0, 40.0];
         }
         // 11 个瘦脸点 + 12 个大眼点
-        let pts = RetouchEngine::face_beauty_points(&lm, 100, 100);
+        let pts = RetouchEngine::face_beauty_points(&lm, 100, 100, 50.0);
         assert_eq!(pts.len(), 23);
         for p in &pts {
             assert!((0.0..=1.0).contains(&p.x));

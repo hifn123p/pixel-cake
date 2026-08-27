@@ -205,6 +205,7 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
                         &lm,
                         img.width,
                         img.height,
+                        req.recipe.beauty.face_slim,
                     ));
                 }
             }
