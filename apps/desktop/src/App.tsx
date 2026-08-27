@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "./api/client";
 import { defaultRecipe, type Photo, type Project, type Recipe } from "./api/types";
-import Canvas from "./components/canvas/Canvas";
+import Canvas, { type Point2D } from "./components/canvas/Canvas";
 import BasePanel from "./components/panels/BasePanel";
 import BeautyPanel from "./components/panels/BeautyPanel";
 import ColorPanel from "./components/panels/ColorPanel";
+import FilterPanel from "./components/panels/FilterPanel";
+import InpaintPanel from "./components/panels/InpaintPanel";
 import ModelManager from "./components/panels/ModelManager";
 import NeutralGrayPanel from "./components/panels/NeutralGrayPanel";
 
@@ -15,6 +17,9 @@ export default function App() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [recipe, setRecipe] = useState<Recipe>(defaultRecipe());
   const [progress, setProgress] = useState<number | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [draftPoints, setDraftPoints] = useState<Point2D[]>([]);
   const [newName, setNewName] = useState("");
   const [importPaths, setImportPaths] = useState("");
 
@@ -23,8 +28,17 @@ export default function App() {
 
     const unlisten = api.onEngineEvent((e) => {
       if (e.type === "progress") setProgress(e.pct);
-      else if (e.type === "done") setProgress(null);
-      else if (e.type === "error") {
+      else if (e.type === "done") {
+        setProgress(null);
+        // 读取 PNG 预览（result_path 为 .tiff，对应 .png）
+        if (e.result_path) {
+          const pngPath = e.result_path.replace(/\.tiff$/, ".png");
+          api
+            .readFileBase64(pngPath)
+            .then((b64) => setPreviewSrc(`data:image/png;base64,${b64}`))
+            .catch(console.error);
+        }
+      } else if (e.type === "error") {
         console.error(e.message);
         setProgress(null);
       }
@@ -124,7 +138,14 @@ export default function App() {
       </aside>
 
       <main className="canvas-area">
-        <Canvas photoName={photo?.raw_path ?? null} progress={progress} />
+        <Canvas
+          photoName={photo?.raw_path ?? null}
+          previewSrc={previewSrc}
+          progress={progress}
+          drawing={drawing}
+          draftPoints={draftPoints}
+          onImageClick={(nx, ny) => setDraftPoints((p) => [...p, { x: nx, y: ny }])}
+        />
       </main>
 
       <aside className="inspector">
@@ -140,9 +161,21 @@ export default function App() {
           value={recipe.color}
           onChange={(v) => updateRecipe({ ...recipe, color: v })}
         />
+        <InpaintPanel
+          value={recipe.inpaint}
+          onChange={(v) => updateRecipe({ ...recipe, inpaint: v })}
+          drawing={drawing}
+          onDrawingChange={setDrawing}
+          draftPoints={draftPoints}
+          onDraftChange={setDraftPoints}
+        />
         <BasePanel
           value={recipe.base}
           onChange={(v) => updateRecipe({ ...recipe, base: v })}
+        />
+        <FilterPanel
+          value={recipe.filter}
+          onChange={(v) => updateRecipe({ ...recipe, filter: v })}
         />
         <button
           className="export-btn"

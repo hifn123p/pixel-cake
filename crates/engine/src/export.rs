@@ -3,7 +3,7 @@
 //! 手写最小 TIFF 编码（16bit RGB、uncompressed、little-endian），
 //! 保持 16bit 全链路精度，避免 8bit 色带。可被标准图像查看器打开。
 
-use crate::image::ImageBuf;
+use crate::image::{linear_to_srgb, ImageBuf};
 
 fn write_u16(buf: &mut [u8], pos: usize, v: u16) {
     buf[pos] = (v & 0xff) as u8;
@@ -97,6 +97,28 @@ pub fn encode_tiff(img: &ImageBuf) -> Vec<u8> {
     }
 
     buf
+}
+
+/// 把线性 f32 图像编码为 8bit sRGB PNG（字节数组，预览用）。
+///
+/// 线性 → sRGB → 8bit，经 `image` crate PNG 编码。仅供前端预览，
+/// 保真导出仍用 [`encode_tiff`]。
+pub fn encode_png(img: &ImageBuf) -> Vec<u8> {
+    let mut rgb = Vec::with_capacity((img.width * img.height * 3) as usize);
+    for y in 0..img.height {
+        for x in 0..img.width {
+            let p = img.pixel(x, y);
+            for c in 0..3 {
+                rgb.push((linear_to_srgb(p[c].clamp(0.0, 1.0)) * 255.0).round() as u8);
+            }
+        }
+    }
+    let img = image::RgbImage::from_raw(img.width, img.height, rgb).expect("尺寸一致");
+    let mut bytes = Vec::new();
+    image::DynamicImage::ImageRgb8(img)
+        .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+        .expect("PNG 编码不应失败");
+    bytes
 }
 
 #[cfg(test)]

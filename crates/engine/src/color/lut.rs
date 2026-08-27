@@ -163,6 +163,31 @@ impl Lut3D {
     }
 }
 
+/// 内置滤镜 LUT（无 `.cube` 文件时的兜底预设）。
+///
+/// 支持 `warm`/`cool`/`bw`/`vivid`，返回 `None` 表示未知滤镜 id。
+pub fn builtin_filter_lut(id: &str) -> Option<Lut3D> {
+    fn clamp3(c: [f32; 3]) -> [f32; 3] {
+        [c[0].clamp(0.0, 1.0), c[1].clamp(0.0, 1.0), c[2].clamp(0.0, 1.0)]
+    }
+    match id {
+        "warm" => Some(Lut3D::from_fn(33, |c| {
+            clamp3([c[0] * 1.08, c[1] * 1.02, c[2] * 0.9])
+        })),
+        "cool" => Some(Lut3D::from_fn(33, |c| {
+            clamp3([c[0] * 0.9, c[1] * 1.0, c[2] * 1.1])
+        })),
+        "bw" => Some(Lut3D::from_fn(33, |c| {
+            let l = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+            [l, l, l]
+        })),
+        "vivid" => Some(Lut3D::from_fn(33, |c| {
+            clamp3([c[0] * 1.15, c[1] * 1.15, c[2] * 1.15])
+        })),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

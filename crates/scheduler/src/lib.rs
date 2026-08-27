@@ -11,8 +11,9 @@ use std::sync::{Arc, Mutex};
 use bus::{EngineEvent, EngineRequest, PipelineStep, Scope};
 use engine::ai::RetouchEngine;
 use engine::base::tone::{CurvePoint, ToneParams};
+use engine::color::lut::builtin_filter_lut;
 use engine::detect::segment::CLASS_SKIN;
-use engine::export::encode_tiff;
+use engine::export::{encode_png, encode_tiff};
 use engine::image::{ColorSpace, ImageBuf};
 use engine::pipeline::{process, Pipeline};
 use engine::raw::decode_auto;
@@ -269,10 +270,14 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     // 4. 16bit 全链路处理
     let result = process(&img, &pipeline);
 
-    // 5. 导出 16bit TIFF
+    // 5. 导出 16bit TIFF + 8bit PNG 预览
     let tiff = encode_tiff(&result);
     let out_path = format!("{}.out.tiff", req.raw_path);
     std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
+
+    let png = encode_png(&result);
+    let png_path = format!("{}.out.png", req.raw_path);
+    std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
 
     Ok(out_path)
 }
@@ -331,10 +336,16 @@ fn recipe_to_pipeline(recipe: &bus::Recipe, w: u32, h: u32) -> Pipeline {
         p.inpaint_mask = Some(mask);
     }
 
+    // 滤镜：内置预设 LUT（warm/cool/bw/vivid）；.cube 文件加载后续接入
+    if let Some(filter) = &recipe.filter {
+        if let Some(lut) = builtin_filter_lut(&filter.lut_id) {
+            p.filter_lut = Some(lut);
+        }
+    }
+
     // TODO(engine): 以下依赖 AI 模型 / 资源加载，接入后填充：
     // - neutral_gray：GAN 预测平整/立体蒙版 → Pipeline::neutral_gray
-    // - color：语义分割 + Lab 迁移烘焙 → Pipeline::color_lut
-    // - filter：按 lut_id 加载 .cube → Pipeline::filter_lut
+    // - color：语义分割 + Lab 迁移烘焙 → Pipeline::color_lut（已在 process_request 现场烘焙）
 
     p
 }

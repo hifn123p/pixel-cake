@@ -88,3 +88,13 @@ pub async fn submit_render(
     };
     state.scheduler.enqueue(req).await.map_err(|e| e.to_string())
 }
+
+/// 读取本地图片文件为 base64（前端预览用）。
+#[tauri::command]
+pub fn read_file_base64(path: String) -> Result<String, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {e}"))?;
+    Ok(base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        &bytes,
+    ))
+}

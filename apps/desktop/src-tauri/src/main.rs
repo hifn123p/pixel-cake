@@ -18,6 +18,7 @@ fn main() {
             commands::save_recipe,
             commands::get_recipe,
             commands::submit_render,
+            commands::read_file_base64,
             models::list_model_packages_cmd,
             models::download_model_cmd,
         ])
