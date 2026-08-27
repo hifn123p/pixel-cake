@@ -79,7 +79,8 @@ impl RawDecoder for LibRawDecoder {
 /// 根据文件扩展名自动选择解码器（PPM / LibRaw）。
 ///
 /// 支持的 RAW 扩展名：cr2/cr3/arw/nef/dng/raf/orf/rw2/pef/srw。
-/// 其他格式（如 jpeg/png）暂不支持，返回 [`DecodeError::UnsupportedFormat`]。
+/// 支持的通用图片：jpg/jpeg/png（经 `image` crate）。
+/// 其他格式返回 [`DecodeError::UnsupportedFormat`]。
 pub fn decode_auto(path: &str, bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
     let ext = std::path::Path::new(path)
         .extension()
@@ -91,8 +92,33 @@ pub fn decode_auto(path: &str, bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
         "cr2" | "cr3" | "arw" | "nef" | "dng" | "raf" | "orf" | "rw2" | "pef" | "srw" => {
             LibRawDecoder.decode(bytes)
         }
+        "jpg" | "jpeg" | "png" => decode_image(bytes),
         _ => Err(DecodeError::UnsupportedFormat),
     }
+}
+
+/// 通用图片解码（JPEG/PNG，经 `image` crate），sRGB → 线性。
+pub fn decode_image(bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
+    let img = image::load_from_memory(bytes).map_err(|_| DecodeError::UnsupportedFormat)?;
+    let rgb = img.to_rgb8();
+    let (w, h) = rgb.dimensions();
+    let mut buf = ImageBuf::new(w, h, ColorSpace::Linear);
+    for y in 0..h {
+        for x in 0..w {
+            let p = rgb.get_pixel(x, y);
+            buf.set_pixel(
+                x,
+                y,
+                [
+                    srgb_to_linear(p[0] as f32 / 255.0),
+                    srgb_to_linear(p[1] as f32 / 255.0),
+                    srgb_to_linear(p[2] as f32 / 255.0),
+                    1.0,
+                ],
+            );
+        }
+    }
+    Ok(buf)
 }
 
 /// 解析 PPM P6（binary RGB）。
@@ -224,5 +250,25 @@ mod tests {
             decode_auto("photo.xyz", &bytes),
             Err(DecodeError::UnsupportedFormat)
         ));
+    }
+
+    #[test]
+    fn decode_image_png_roundtrip() {
+        // 用 image crate 编码 2x2 PNG，再解码验证
+        let mut bytes = Vec::new();
+        let img = image::RgbImage::from_fn(2, 2, |x, y| {
+            image::Rgb([x as u8 * 100, y as u8 * 100, 128])
+        });
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .unwrap();
+
+        let decoded = decode_image(&bytes).unwrap();
+        assert_eq!((decoded.width, decoded.height), (2, 2));
+        // (0,0) = [0, 0, 128]，B 通道应转线性
+        let p = decoded.pixel(0, 0);
+        assert!(p[0] < 1e-4);
+        assert!(p[1] < 1e-4);
+        assert!((p[2] - srgb_to_linear(128.0 / 255.0)).abs() < 1e-4);
     }
 }

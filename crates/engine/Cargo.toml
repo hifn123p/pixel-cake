@@ -10,6 +10,8 @@ libraw-rs = "0.0.4"
 # 与 copy-dylibs（复制 onnxruntime*.dll 到 target）。cuda feature 启用 CUDA 执行提供者。
 ort = { version = "2.0.0-rc.13", features = ["cuda"] }
 ndarray = "0.17"
+# 通用图片解码（JPEG/PNG），最小化 feature。
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
