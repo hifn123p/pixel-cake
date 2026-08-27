@@ -138,12 +138,16 @@ mod tests {
 
     #[test]
     fn postprocess_maps_range() {
-        // 输入 -1 → 0（黑），+1 → 1（白），0 → 0.5 灰度
-        let data = [-1.0f32, 0.0, 1.0];
-        let img = enhance_postprocess(&data, 1, 1);
-        assert!(img.pixel(0, 0)[0] < 1e-4); // -1 → 黑
-        assert!(img.pixel(0, 0)[1] < 1e-4);
-        assert!(img.pixel(0, 0)[2] < 1e-4);
+        // 1x1 图像，3 个通道：全 -1 → 黑（线性 0），全 +1 → 白（线性 1）
+        let black = enhance_postprocess(&[-1.0, -1.0, -1.0], 1, 1);
+        assert!(black.pixel(0, 0)[0] < 1e-4);
+        assert!(black.pixel(0, 0)[1] < 1e-4);
+        assert!(black.pixel(0, 0)[2] < 1e-4);
+
+        let white = enhance_postprocess(&[1.0, 1.0, 1.0], 1, 1);
+        assert!((white.pixel(0, 0)[0] - 1.0).abs() < 1e-4);
+        assert!((white.pixel(0, 0)[1] - 1.0).abs() < 1e-4);
+        assert!((white.pixel(0, 0)[2] - 1.0).abs() < 1e-4);
     }
 
     #[test]
