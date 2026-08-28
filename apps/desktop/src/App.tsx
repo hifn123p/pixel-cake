@@ -9,6 +9,7 @@ import FilterPanel from "./components/panels/FilterPanel";
 import InpaintPanel from "./components/panels/InpaintPanel";
 import ModelManager from "./components/panels/ModelManager";
 import NeutralGrayPanel from "./components/panels/NeutralGrayPanel";
+import PresetPanel from "./components/panels/PresetPanel";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -201,6 +202,8 @@ export default function App() {
           >
             导出（全分辨率）
           </button>
+
+          <PresetPanel currentRecipe={recipe} onApplyRecipe={updateRecipe} />
 
           <ModelManager />
         </aside>

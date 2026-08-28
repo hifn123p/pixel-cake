@@ -4,7 +4,7 @@
 //! 错误统一映射为 `String` 返回前端。
 
 use bus::{EngineRequest, Recipe, Scope};
-use storage::{Photo, Project};
+use storage::{Photo, Preset, Project};
 use tauri::{AppHandle, Manager, State};
 
 use crate::state::AppState;
@@ -106,4 +106,23 @@ pub fn read_preview(state: State<AppState>, photo_id: String) -> Result<String, 
         &base64::engine::general_purpose::STANDARD,
         &bytes,
     ))
+}
+
+/// 保存当前编辑参数为预设。
+#[tauri::command]
+pub fn save_preset_cmd(
+    state: State<AppState>,
+    name: String,
+    recipe: Recipe,
+) -> Result<Preset, String> {
+    state
+        .store
+        .save_preset(&name, "我的样片", &recipe, None)
+        .map_err(|e| e.to_string())
+}
+
+/// 列出全部预设。
+#[tauri::command]
+pub fn list_presets_cmd(state: State<AppState>) -> Result<Vec<Preset>, String> {
+    state.store.list_presets().map_err(|e| e.to_string())
 }

@@ -19,6 +19,8 @@ fn main() {
             commands::get_recipe,
             commands::submit_render,
             commands::read_preview,
+            commands::save_preset_cmd,
+            commands::list_presets_cmd,
             models::list_model_packages_cmd,
             models::download_model_cmd,
         ])

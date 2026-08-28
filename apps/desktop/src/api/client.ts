@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { EngineEvent, ModelPackage, Photo, Project, Recipe } from "./types";
+import type { EngineEvent, ModelPackage, Photo, Preset, Project, Recipe } from "./types";
 
 export const api = {
   createProject: (name: string) => invoke<Project>("create_project", { name }),
@@ -26,6 +26,13 @@ export const api = {
 
   /** 读取某照片的最新预览 PNG 为 base64（后端按 photo_id 查路径，安全）。 */
   readPreview: (photoId: string) => invoke<string>("read_preview", { photoId }),
+
+  /** 保存当前编辑参数为预设。 */
+  savePreset: (name: string, recipe: Recipe) =>
+    invoke<Preset>("save_preset_cmd", { name, recipe }),
+
+  /** 列出全部预设。 */
+  listPresets: () => invoke<Preset[]>("list_presets_cmd"),
 
   /** 模型资源包：列出清单 + 本地状态。 */
   listModelPackages: () => invoke<ModelPackage[]>("list_model_packages_cmd"),

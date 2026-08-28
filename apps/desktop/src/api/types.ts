@@ -78,6 +78,15 @@ export interface Recipe {
   filter: Filter | null;
 }
 
+/** 预设（保存的编辑参数，recipe_json 为序列化 Recipe）。 */
+export interface Preset {
+  id: string;
+  name: string;
+  scope: string;
+  recipe_json: string;
+  lut_path: string | null;
+}
+
 export function defaultRecipe(): Recipe {
   return {
     neutral_gray: { enabled: false, ka: 0, kb: 0, mode: "Dual" },
