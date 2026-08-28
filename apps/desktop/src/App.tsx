@@ -90,6 +90,12 @@ export default function App() {
     }, 200);
   }
 
+  // 批量导出：对当前项目全部照片应用当前 recipe，统一风格导出（后台队列逐个处理）。
+  function exportAll() {
+    if (!projectId) return;
+    photos.forEach((p) => api.submitRender(p.id, recipe, "export").catch(console.error));
+  }
+
   return (
     <div className="app-shell">
       <header className="menubar">
@@ -103,6 +109,9 @@ export default function App() {
             onClick={() => photo && api.submitRender(photo.id, recipe, "export")}
           >
             导出
+          </button>
+          <button disabled={!projectId || photos.length === 0} onClick={exportAll}>
+            批量导出
           </button>
           <button onClick={() => setAbout(true)}>关于</button>
         </nav>
