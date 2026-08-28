@@ -152,8 +152,13 @@ export default function App() {
                 onClick={() => selectPhoto(p)}
                 title={p.raw_path}
               >
-                {p.raw_path.split(/[\\/]/).pop()}
-                <span className={`status status-${p.status}`}>{p.status}</span>
+              {p.raw_path.split(/[\\/]/).pop()}
+              {p.width > 0 && (
+                <span className="muted">
+                  {p.width}×{p.height}
+                </span>
+              )}
+              <span className={`status status-${p.status}`}>{p.status}</span>
               </li>
             ))}
           </ul>

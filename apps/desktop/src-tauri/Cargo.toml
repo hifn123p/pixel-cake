@@ -18,5 +18,6 @@ ureq = "2"
 base64 = "0.22"
 
 bus = { path = "../../../crates/bus" }
+engine = { path = "../../../crates/engine" }
 scheduler = { path = "../../../crates/scheduler" }
 storage = { path = "../../../crates/storage" }

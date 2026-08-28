@@ -97,6 +97,41 @@ pub fn decode_auto(path: &str, bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
     }
 }
 
+/// 快速读取图片尺寸（只读文件头，不全量解码）。
+///
+/// 支持 PPM（解析头）与 JPEG/PNG（`image` crate 读头）；RAW 读头较复杂，
+/// 暂返回 `None`（照片列表显示未知尺寸，解码时再确认）。
+pub fn probe_dimensions(path: &str) -> Option<(u32, u32)> {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    match ext.as_str() {
+        "ppm" | "pnm" => {
+            let bytes = std::fs::read(path).ok()?;
+            probe_ppm_dimensions(&bytes)
+        }
+        _ => image::ImageReader::open(path)
+            .ok()?
+            .into_dimensions()
+            .ok(),
+    }
+}
+
+/// 解析 PPM 头的宽高（不校验数据）。
+fn probe_ppm_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    if bytes.len() < 2 || &bytes[0..2] != b"P6" {
+        return None;
+    }
+    let mut i = 2;
+    i = skip_ws(bytes, i).ok()?;
+    let (w, ni) = parse_num(bytes, i).ok()?;
+    i = skip_ws(bytes, ni).ok()?;
+    let (h, _) = parse_num(bytes, i).ok()?;
+    Some((w, h))
+}
+
 /// 通用图片解码（JPEG/PNG，经 `image` crate），sRGB → 线性。
 pub fn decode_image(bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
     let img = image::load_from_memory(bytes).map_err(|_| DecodeError::UnsupportedFormat)?;

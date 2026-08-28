@@ -27,17 +27,18 @@ pub fn list_projects(state: State<AppState>) -> Result<Vec<Project>, String> {
     state.store.list_projects().map_err(|e| e.to_string())
 }
 
-/// 导入照片（RAW/JPEG 路径列表）。尺寸解码在 engine 接入前以 0 占位。
+/// 导入照片（RAW/JPEG 路径列表）。尺寸经 engine 探测（读头，不全量解码）。
 #[tauri::command]
 pub fn import_photos(
     state: State<AppState>,
     project_id: String,
     paths: Vec<String>,
 ) -> Result<Vec<Photo>, String> {
-    // TODO(M1-raw): 尺寸应由 engine::raw 解码得到，此处占位 (0,0)。
     state
         .store
-        .import_photos(&project_id, &paths, |_| (0, 0))
+        .import_photos(&project_id, &paths, |p| {
+            engine::raw::probe_dimensions(p).unwrap_or((0, 0))
+        })
         .map_err(|e| e.to_string())
 }
 
