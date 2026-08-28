@@ -15,6 +15,7 @@ use engine::color::lut::builtin_filter_lut;
 use engine::detect::segment::CLASS_SKIN;
 use engine::export::{encode_png, encode_tiff};
 use engine::image::{ColorSpace, ImageBuf};
+use engine::infer::resize_bilinear;
 use engine::pipeline::{process, Pipeline};
 use engine::raw::decode_auto;
 use engine::retouch::beauty::LiquifyPoint;
@@ -191,6 +192,18 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
     let mut img = decode_auto(&req.raw_path, &bytes).map_err(|e| format!("解码失败: {e}"))?;
 
+    // 预览模式：缩小到代理尺寸（最长边 1600px），显著提升编辑响应速度；
+    // 导出模式保持全分辨率。
+    if req.scope == Scope::Preview {
+        let max_edge = img.width.max(img.height);
+        if max_edge > 1600 {
+            let scale = 1600.0 / max_edge as f32;
+            let w = ((img.width as f32 * scale).round() as u32).max(1);
+            let h = ((img.height as f32 * scale).round() as u32).max(1);
+            img = resize_bilinear(&img, w, h);
+        }
+    }
+
     // 2. Recipe → Pipeline
     let mut pipeline = recipe_to_pipeline(&req.recipe, img.width, img.height);
 
@@ -270,14 +283,18 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     // 4. 16bit 全链路处理
     let result = process(&img, &pipeline);
 
-    // 5. 导出 16bit TIFF + 8bit PNG 预览
-    let tiff = encode_tiff(&result);
+    // 5. 导出：预览仅输出 8bit PNG（小图，快）；导出输出 16bit TIFF + PNG（全分辨率）
     let out_path = format!("{}.out.tiff", req.raw_path);
-    std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
-
-    let png = encode_png(&result);
     let png_path = format!("{}.out.png", req.raw_path);
-    std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
+    if req.scope == Scope::Preview {
+        let png = encode_png(&result);
+        std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
+    } else {
+        let tiff = encode_tiff(&result);
+        std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
+        let png = encode_png(&result);
+        std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
+    }
 
     Ok(out_path)
 }

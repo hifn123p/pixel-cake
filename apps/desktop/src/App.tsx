@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api/client";
 import { defaultRecipe, type Photo, type Project, type Recipe } from "./api/types";
 import Canvas, { type Point2D } from "./components/canvas/Canvas";
@@ -24,6 +24,7 @@ export default function App() {
   const [newName, setNewName] = useState("");
   const [importPaths, setImportPaths] = useState("");
   const [about, setAbout] = useState(false);
+  const renderTimer = useRef<number | null>(null);
 
   useEffect(() => {
     api.listProjects().then(setProjects).catch(console.error);
@@ -78,12 +79,15 @@ export default function App() {
   }
 
   // 编辑即保存，并提交代理图预览（文档 §4.8：预览与重算靠 recipe 解耦）。
+  // 预览重算带 200ms 防抖，避免滑块拖动时高频触发后端全链路。
   function updateRecipe(next: Recipe) {
     setRecipe(next);
-    if (photo) {
-      api.saveRecipe(photo.id, next).catch(console.error);
+    if (!photo) return;
+    api.saveRecipe(photo.id, next).catch(console.error);
+    if (renderTimer.current) window.clearTimeout(renderTimer.current);
+    renderTimer.current = window.setTimeout(() => {
       api.submitRender(photo.id, next, "preview").catch(console.error);
-    }
+    }, 200);
   }
 
   return (
