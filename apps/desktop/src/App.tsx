@@ -24,7 +24,10 @@ export default function App() {
   const [newName, setNewName] = useState("");
   const [importPaths, setImportPaths] = useState("");
   const [about, setAbout] = useState(false);
+  const [batchInfo, setBatchInfo] = useState<string | null>(null);
   const renderTimer = useRef<number | null>(null);
+  const batchTotal = useRef(0);
+  const batchDone = useRef(0);
 
   useEffect(() => {
     api.listProjects().then(setProjects).catch(console.error);
@@ -33,6 +36,17 @@ export default function App() {
       if (e.type === "progress") setProgress(e.pct);
       else if (e.type === "done") {
         setProgress(null);
+        // 批量导出进度：累计完成数
+        if (batchTotal.current > 0) {
+          batchDone.current += 1;
+          if (batchDone.current >= batchTotal.current) {
+            setBatchInfo(null);
+            batchTotal.current = 0;
+            batchDone.current = 0;
+          } else {
+            setBatchInfo(`批量导出 ${batchDone.current}/${batchTotal.current}`);
+          }
+        }
         // 读取 PNG 预览（后端按 photo_id 查询路径）
         api
           .readPreview(e.photo_id)
@@ -92,7 +106,10 @@ export default function App() {
 
   // 批量导出：对当前项目全部照片应用当前 recipe，统一风格导出（后台队列逐个处理）。
   function exportAll() {
-    if (!projectId) return;
+    if (!projectId || photos.length === 0) return;
+    batchTotal.current = photos.length;
+    batchDone.current = 0;
+    setBatchInfo(`批量导出 0/${photos.length}`);
     photos.forEach((p) => api.submitRender(p.id, recipe, "export").catch(console.error));
   }
 
@@ -230,6 +247,7 @@ export default function App() {
       <footer className="statusbar">
         <span>{photo ? `当前：${photo.raw_path.split(/[\\/]/).pop()}` : "未选择照片"}</span>
         {progress !== null && <span>处理中 {Math.round(progress)}%</span>}
+        {batchInfo && <span>{batchInfo}</span>}
         <span className="statusbar-right">本地 GPU 推理</span>
       </footer>
 
