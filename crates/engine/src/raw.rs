@@ -137,6 +137,17 @@ pub fn decode_ppm(bytes: &[u8]) -> Result<ImageBuf, DecodeError> {
     i = skip_ws(bytes, ni)?;
 
     let data = &bytes[i..];
+
+    // 头文件宽高可信度校验：防恶意头导致超大分配（ImageBuf::new 会 panic，这里优雅返回 Err）
+    if w == 0
+        || h == 0
+        || (w as usize)
+            .checked_mul(h as usize)
+            .is_none_or(|n| n > crate::image::MAX_PIXELS)
+    {
+        return Err(DecodeError::InvalidHeader);
+    }
+
     let mut img = ImageBuf::new(w, h, ColorSpace::Linear);
 
     if maxval <= 255 {

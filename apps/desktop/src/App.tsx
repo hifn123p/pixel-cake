@@ -22,6 +22,7 @@ export default function App() {
   const [draftPoints, setDraftPoints] = useState<Point2D[]>([]);
   const [newName, setNewName] = useState("");
   const [importPaths, setImportPaths] = useState("");
+  const [about, setAbout] = useState(false);
 
   useEffect(() => {
     api.listProjects().then(setProjects).catch(console.error);
@@ -30,14 +31,11 @@ export default function App() {
       if (e.type === "progress") setProgress(e.pct);
       else if (e.type === "done") {
         setProgress(null);
-        // 读取 PNG 预览（result_path 为 .tiff，对应 .png）
-        if (e.result_path) {
-          const pngPath = e.result_path.replace(/\.tiff$/, ".png");
-          api
-            .readFileBase64(pngPath)
-            .then((b64) => setPreviewSrc(`data:image/png;base64,${b64}`))
-            .catch(console.error);
-        }
+        // 读取 PNG 预览（后端按 photo_id 查询路径）
+        api
+          .readPreview(e.photo_id)
+          .then((b64) => setPreviewSrc(`data:image/png;base64,${b64}`))
+          .catch(console.error);
       } else if (e.type === "error") {
         console.error(e.message);
         setProgress(null);
@@ -88,105 +86,147 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="block">
-          <input
-            placeholder="新建项目名"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <button onClick={createProject}>新建项目</button>
-        </div>
-
-        <ul className="list">
-          {projects.map((p) => (
-            <li
-              key={p.id}
-              className={p.id === projectId ? "active" : ""}
-              onClick={() => selectProject(p.id)}
-            >
-              {p.name}
-            </li>
-          ))}
-        </ul>
-
-        <div className="block">
-          <input
-            placeholder="导入路径（逗号分隔）"
-            value={importPaths}
-            onChange={(e) => setImportPaths(e.target.value)}
-          />
-          <button onClick={importPhotos} disabled={!projectId}>
+    <div className="app-shell">
+      <header className="menubar">
+        <span className="brand">像素蛋糕</span>
+        <nav className="menu">
+          <button onClick={() => document.getElementById("import-input")?.focus()}>
             导入照片
           </button>
+          <button
+            disabled={!photo}
+            onClick={() => photo && api.submitRender(photo.id, recipe, "export")}
+          >
+            导出
+          </button>
+          <button onClick={() => setAbout(true)}>关于</button>
+        </nav>
+        <span className="menubar-right">v0.1.0</span>
+      </header>
+
+      <div className="app">
+        <aside className="sidebar">
+          <div className="block">
+            <input
+              placeholder="新建项目名"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <button onClick={createProject}>新建项目</button>
+          </div>
+
+          <ul className="list">
+            {projects.map((p) => (
+              <li
+                key={p.id}
+                className={p.id === projectId ? "active" : ""}
+                onClick={() => selectProject(p.id)}
+              >
+                {p.name}
+              </li>
+            ))}
+          </ul>
+
+          <div className="block">
+            <input
+              id="import-input"
+              placeholder="导入路径（逗号分隔）"
+              value={importPaths}
+              onChange={(e) => setImportPaths(e.target.value)}
+            />
+            <button onClick={importPhotos} disabled={!projectId}>
+              导入照片
+            </button>
+          </div>
+
+          <ul className="list">
+            {photos.map((p) => (
+              <li
+                key={p.id}
+                className={p.id === photo?.id ? "active" : ""}
+                onClick={() => selectPhoto(p)}
+                title={p.raw_path}
+              >
+                {p.raw_path.split(/[\\/]/).pop()}
+                <span className={`status status-${p.status}`}>{p.status}</span>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        <main className="canvas-area">
+          <Canvas
+            photoName={photo?.raw_path ?? null}
+            previewSrc={previewSrc}
+            progress={progress}
+            drawing={drawing}
+            draftPoints={draftPoints}
+            onImageClick={(nx, ny) => setDraftPoints((p) => [...p, { x: nx, y: ny }])}
+          />
+        </main>
+
+        <aside className="inspector">
+          <NeutralGrayPanel
+            value={recipe.neutral_gray}
+            onChange={(v) => updateRecipe({ ...recipe, neutral_gray: v })}
+          />
+          <BeautyPanel
+            value={recipe.beauty}
+            onChange={(v) => updateRecipe({ ...recipe, beauty: v })}
+          />
+          <ColorPanel
+            value={recipe.color}
+            onChange={(v) => updateRecipe({ ...recipe, color: v })}
+          />
+          <InpaintPanel
+            value={recipe.inpaint}
+            onChange={(v) => updateRecipe({ ...recipe, inpaint: v })}
+            drawing={drawing}
+            onDrawingChange={setDrawing}
+            draftPoints={draftPoints}
+            onDraftChange={setDraftPoints}
+          />
+          <BasePanel
+            value={recipe.base}
+            onChange={(v) => updateRecipe({ ...recipe, base: v })}
+          />
+          <FilterPanel
+            value={recipe.filter}
+            onChange={(v) => updateRecipe({ ...recipe, filter: v })}
+          />
+          <button
+            className="export-btn"
+            disabled={!photo}
+            onClick={() => photo && api.submitRender(photo.id, recipe, "export")}
+          >
+            导出（全分辨率）
+          </button>
+
+          <ModelManager />
+        </aside>
+      </div>
+
+      <footer className="statusbar">
+        <span>{photo ? `当前：${photo.raw_path.split(/[\\/]/).pop()}` : "未选择照片"}</span>
+        {progress !== null && <span>处理中 {Math.round(progress)}%</span>}
+        <span className="statusbar-right">本地 GPU 推理</span>
+      </footer>
+
+      {about && (
+        <div className="modal-mask" onClick={() => setAbout(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>像素蛋糕</h2>
+            <p className="muted">版本 0.1.0</p>
+            <p>
+              本地 AI 修图客户端：中性灰磨皮、AI 美型、祛瑕、AI 追色、基础调色、滤镜。
+            </p>
+            <p className="muted">
+              数据全部本地存储，AI 推理在本地 NVIDIA GPU（RTX 3070）完成，无需联网。
+            </p>
+            <button onClick={() => setAbout(false)}>关闭</button>
+          </div>
         </div>
-
-        <ul className="list">
-          {photos.map((p) => (
-            <li
-              key={p.id}
-              className={p.id === photo?.id ? "active" : ""}
-              onClick={() => selectPhoto(p)}
-              title={p.raw_path}
-            >
-              {p.raw_path.split(/[\\/]/).pop()}
-              <span className={`status status-${p.status}`}>{p.status}</span>
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-      <main className="canvas-area">
-        <Canvas
-          photoName={photo?.raw_path ?? null}
-          previewSrc={previewSrc}
-          progress={progress}
-          drawing={drawing}
-          draftPoints={draftPoints}
-          onImageClick={(nx, ny) => setDraftPoints((p) => [...p, { x: nx, y: ny }])}
-        />
-      </main>
-
-      <aside className="inspector">
-        <NeutralGrayPanel
-          value={recipe.neutral_gray}
-          onChange={(v) => updateRecipe({ ...recipe, neutral_gray: v })}
-        />
-        <BeautyPanel
-          value={recipe.beauty}
-          onChange={(v) => updateRecipe({ ...recipe, beauty: v })}
-        />
-        <ColorPanel
-          value={recipe.color}
-          onChange={(v) => updateRecipe({ ...recipe, color: v })}
-        />
-        <InpaintPanel
-          value={recipe.inpaint}
-          onChange={(v) => updateRecipe({ ...recipe, inpaint: v })}
-          drawing={drawing}
-          onDrawingChange={setDrawing}
-          draftPoints={draftPoints}
-          onDraftChange={setDraftPoints}
-        />
-        <BasePanel
-          value={recipe.base}
-          onChange={(v) => updateRecipe({ ...recipe, base: v })}
-        />
-        <FilterPanel
-          value={recipe.filter}
-          onChange={(v) => updateRecipe({ ...recipe, filter: v })}
-        />
-        <button
-          className="export-btn"
-          disabled={!photo}
-          onClick={() => photo && api.submitRender(photo.id, recipe, "export")}
-        >
-          导出（全分辨率）
-        </button>
-
-        <ModelManager />
-      </aside>
+      )}
     </div>
   );
 }

@@ -1,14 +1,51 @@
+# ===== Rust 构建产物 =====
 /target
 **/*.rs.bk
 *.pdb
-.idea/
-.vscode/
 
-# 前端
+# ===== 隐私敏感文件（严禁上传）=====
+# 数据库（含用户照片元数据与 recipe）
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 环境变量 / 密钥 / 令牌
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+token*
+credentials*
+secrets*
+
+# ===== 运行时生成的数据（不入库）=====
+# 引擎导出的预览/成品
+*.out.png
+*.out.tiff
+*.proxy.jpg
+# 下载的模型文件
+*.onnx
+
+# ===== 前端 =====
 node_modules/
 dist/
-.tmp_check/
+*.local
+npm-debug.log*
 
-# 图标由 scripts/gen_icon.mjs 在 CI 内生成，不入库（避免二进制传输）
+# ===== IDE / 系统文件 =====
+.idea/
+.vscode/
+*.suo
+*.user
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ===== 图标由 scripts/gen_icon.mjs 在 CI 内生成，不入库（避免二进制传输）=====
 apps/desktop/src-tauri/icons/
-

@@ -24,8 +24,8 @@ export const api = {
   submitRender: (photoId: string, recipe: Recipe, scope: "preview" | "export") =>
     invoke<void>("submit_render", { photoId, recipe, scope }),
 
-  /** 读取本地图片文件为 base64（预览显示）。 */
-  readFileBase64: (path: string) => invoke<string>("read_file_base64", { path }),
+  /** 读取某照片的最新预览 PNG 为 base64（后端按 photo_id 查路径，安全）。 */
+  readPreview: (photoId: string) => invoke<string>("read_preview", { photoId }),
 
   /** 模型资源包：列出清单 + 本地状态。 */
   listModelPackages: () => invoke<ModelPackage[]>("list_model_packages_cmd"),

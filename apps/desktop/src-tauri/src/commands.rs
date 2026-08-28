@@ -89,10 +89,19 @@ pub async fn submit_render(
     state.scheduler.enqueue(req).await.map_err(|e| e.to_string())
 }
 
-/// 读取本地图片文件为 base64（前端预览用）。
+/// 读取某照片的最新预览 PNG 为 base64（前端显示）。
+///
+/// 安全设计：前端只传 `photo_id`，实际路径由后端从数据库查询并拼接，
+/// 不暴露任意文件读取能力。
 #[tauri::command]
-pub fn read_file_base64(path: String) -> Result<String, String> {
-    let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {e}"))?;
+pub fn read_preview(state: State<AppState>, photo_id: String) -> Result<String, String> {
+    let photo = state
+        .store
+        .get_photo(&photo_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "照片不存在".to_string())?;
+    let png_path = format!("{}.out.png", photo.raw_path);
+    let bytes = std::fs::read(&png_path).map_err(|e| format!("读取预览失败: {e}"))?;
     Ok(base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
         &bytes,

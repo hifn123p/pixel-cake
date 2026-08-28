@@ -29,10 +29,18 @@ pub struct ImageBuf {
     planes: [Vec<f32>; 4],
 }
 
+/// 单图最大像素数上限（约 2 亿，远超 8K 照片），防止恶意/损坏头导致 OOM。
+pub const MAX_PIXELS: usize = 200_000_000;
+
 impl ImageBuf {
     /// 以指定色彩空间新建缓冲，像素初值为 0。
+    ///
+    /// 超出 [`MAX_PIXELS`] 的尺寸直接 panic（防溢出与 OOM）。
     pub fn new(width: u32, height: u32, space: ColorSpace) -> Self {
-        let n = (width as usize) * (height as usize);
+        let n = (width as usize)
+            .checked_mul(height as usize)
+            .filter(|&n| n <= MAX_PIXELS)
+            .expect("图像尺寸非法（过大或溢出）");
         Self {
             width,
             height,
@@ -47,9 +55,15 @@ impl ImageBuf {
     }
 
     /// 从 8bit sRGB 解码为线性 RGB（RAW 之外的导入边界）。
+    ///
+    /// `bytes` 长度不足时 panic（防止越界读取）。
     pub fn from_srgb_rgba8(width: u32, height: u32, bytes: &[u8]) -> Self {
+        let n = (width as usize)
+            .checked_mul(height as usize)
+            .filter(|&n| n <= MAX_PIXELS)
+            .expect("图像尺寸非法（过大或溢出）");
+        assert!(bytes.len() >= n * 4, "RGBA8 数据长度不足");
         let mut buf = Self::new(width, height, ColorSpace::Linear);
-        let n = (width as usize) * (height as usize);
         for i in 0..n {
             let o = i * 4;
             buf.planes[0][i] = srgb_to_linear(bytes[o] as f32 / 255.0);

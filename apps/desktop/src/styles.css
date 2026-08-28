@@ -24,10 +24,112 @@ body,
   background: var(--bg);
 }
 
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
 .app {
   display: grid;
   grid-template-columns: 240px 1fr 300px;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 顶部菜单栏 */
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  height: 40px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.menubar .brand {
+  font-weight: 700;
+  color: var(--brand);
+  font-size: 14px;
+}
+
+.menubar .menu {
+  display: flex;
+  gap: 6px;
+}
+
+.menubar .menu button {
+  background: transparent;
+  color: var(--sub);
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.menubar .menu button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--panel2);
+}
+
+.menubar-right {
+  margin-left: auto;
+  color: var(--sub);
+  font-size: 12px;
+}
+
+/* 底部状态栏 */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 26px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  color: var(--sub);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.statusbar-right {
+  margin-left: auto;
+}
+
+/* 关于弹窗 */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  text-align: center;
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  color: var(--brand);
+}
+
+.modal p {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.modal button {
+  margin-top: 16px;
 }
 
 .sidebar,

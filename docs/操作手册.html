@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>像素蛋糕 · 操作手册</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --panel2: #262a33;
+    --line: #333842;
+    --ink: #e6e8ec;
+    --sub: #9aa1ad;
+    --brand: #7c4dff;
+    --brand2: #00b8d4;
+    --ok: #3ddc84;
+    --warn: #ffb454;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.7;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 24px 80px; }
+  header.hero {
+    text-align: center;
+    padding: 40px 0 28px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+  header.hero h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    color: var(--brand);
+  }
+  header.hero p { margin: 4px 0; color: var(--sub); font-size: 14px; }
+  h2 {
+    color: var(--brand2);
+    font-size: 20px;
+    border-left: 4px solid var(--brand2);
+    padding-left: 12px;
+    margin: 40px 0 16px;
+  }
+  h3 { color: var(--ink); font-size: 15px; margin: 20px 0 8px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .card.alert { border-left: 4px solid var(--warn); }
+  .card.info { border-left: 4px solid var(--brand2); }
+  .card.danger { border-left: 4px solid #ff6b6b; }
+  ol.steps, ul { padding-left: 22px; }
+  ol.steps li, ul li { margin: 6px 0; font-size: 14px; }
+  code {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 13px;
+    color: var(--brand2);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: var(--panel2); color: var(--brand); }
+  .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: var(--panel2);
+    color: var(--sub);
+    margin-right: 6px;
+  }
+  .tag.ok { background: rgba(61,220,132,.15); color: var(--ok); }
+  .tag.warn { background: rgba(255,180,84,.15); color: var(--warn); }
+
+  /* ===== 界面示意图（CSS 绘制）===== */
+  .ui {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+    font-size: 12px;
+  }
+  .ui .bar {
+    background: var(--panel2);
+    padding: 6px 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    color: var(--sub);
+    border-bottom: 1px solid var(--line);
+  }
+  .ui .bar .brand { color: var(--brand); font-weight: 700; }
+  .ui .body {
+    display: flex;
+    min-height: 220px;
+  }
+  .ui .col {
+    padding: 8px;
+    color: var(--sub);
+  }
+  .ui .col.side { width: 120px; background: var(--panel); border-right: 1px solid var(--line); }
+  .ui .col.mid { flex: 1; background: #0d0e11; display: flex; align-items: center; justify-content: center; }
+  .ui .col.right { width: 150px; background: var(--panel); border-left: 1px solid var(--line); }
+  .ui .ui-row { padding: 4px 6px; margin: 2px 0; border-radius: 4px; background: var(--panel2); color: var(--ink); }
+  .ui .ui-item { padding: 3px 6px; margin: 3px 0; border-radius: 4px; background: var(--panel2); }
+  .ui .ui-item.hl { background: var(--brand); color: #fff; }
+  .ui .ui-canvas { color: var(--sub); }
+  .ui .status { border-top: 1px solid var(--line); background: var(--panel2); padding: 4px 10px; color: var(--sub); font-size: 11px; display: flex; justify-content: space-between; }
+  .caption { text-align: center; color: var(--sub); font-size: 12px; margin: 4px 0 16px; }
+
+  .fig-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .fig-row .fig { flex: 1; min-width: 200px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>🍰 像素蛋糕 · 操作手册</h1>
+  <p>本地 AI 修图客户端（Windows 11）</p>
+  <p>版本 0.1.0 · 安装 / 部署 / 使用 / 卸载</p>
+</header>
+
+<!-- ============ 安装 ============ -->
+<h2>一、安装</h2>
+
+<h3>1.1 系统要求</h3>
+<div class="card info">
+  <table>
+    <tr><th>项目</th><th>要求</th></tr>
+    <tr><td>操作系统</td><td>Windows 10 / Windows 11（64 位）</td></tr>
+    <tr><td>GPU（AI 功能）</td><td>NVIDIA 显卡（推荐 RTX 30 系列及以上），驱动 ≥ 550 系列</td></tr>
+    <tr><td>运行库</td><td>Microsoft VC++ 运行库（<a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color:var(--brand2)">下载</a>）</td></tr>
+    <tr><td>内存</td><td>≥ 8 GB</td></tr>
+    <tr><td>磁盘</td><td>≥ 2 GB 可用空间（模型 + 照片数据另计）</td></tr>
+  </table>
+  <p style="font-size:13px;margin:8px 0 0">
+    <span class="tag warn">注意</span>AI 推理需要支持 CUDA 的 NVIDIA 驱动；无独显时应用仍可启动，AI 功能将自动降级（仅基础调色 / 手动美型可用）。
+  </p>
+</div>
+
+<h3>1.2 安装步骤</h3>
+<div class="card">
+  <ol class="steps">
+    <li><b>获取安装包</b>：从发布渠道下载 <code>像素蛋糕-x.x.x-setup.exe</code>（NSIS 安装包）。</li>
+    <li><b>运行安装包</b>：双击安装程序，如遇 SmartScreen 提示选择「仍要运行」。</li>
+    <li><b>选择安装目录</b>：默认安装到 <code>%LOCALAPPDATA%\像素蛋糕</code>，可修改。</li>
+    <li><b>完成安装</b>：点击「完成」，桌面将出现「像素蛋糕」快捷方式。</li>
+    <li><b>确认运行库</b>：若启动报缺失 DLL，先安装 <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color:var(--brand2)">VC++ 运行库</a>。</li>
+  </ol>
+</div>
+
+<h3>1.3 首次启动</h3>
+<div class="card">
+  <p>首次启动后应用会创建数据目录并初始化数据库：</p>
+  <table>
+    <tr><th>路径</th><th>用途</th></tr>
+    <tr><td><code>%APPDATA%\com.pixcake.desktop\pixcake.db</code></td><td>项目 / 照片 / 编辑参数（SQLite）</td></tr>
+    <tr><td><code>%APPDATA%\com.pixcake.desktop\libraries\</code></td><td>客片组目录</td></tr>
+    <tr><td><code>%APPDATA%\com.pixcake.desktop\models\</code></td><td>AI 模型文件（应用内下载）</td></tr>
+  </table>
+  <p style="font-size:13px"><span class="tag ok">提示</span>数据完全本地保存，备份以上目录即可迁移。</p>
+</div>
+
+<!-- ============ 部署 ============ -->
+<h2>二、部署（AI 模型）</h2>
+
+<div class="card info">
+  <p>AI 功能（美型 / 追色 / 磨皮）依赖 4 个 ONNX 模型，需在应用内一次性下载。模型约 340 MB。</p>
+  <table>
+    <tr><th>模型</th><th>文件名</th><th>用途</th></tr>
+    <tr><td>SCRFD 2.5G</td><td>scrfd_2.5g.onnx</td><td>人脸检测</td></tr>
+    <tr><td>2DFAN4</td><td>2dfan4.onnx</td><td>68 点关键点（美型）</td></tr>
+    <tr><td>BiSeNet</td><td>bisenet_resnet_34.onnx</td><td>皮肤分割（追色）</td></tr>
+    <tr><td>GPEN BFR 512</td><td>gpen_bfr_512.onnx</td><td>皮肤增强（磨皮）</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <ol class="steps">
+    <li>打开应用，在右侧面板底部找到<b>「模型下载」</b>区域。</li>
+    <li>点击各模型旁的「下载」按钮，等待进度完成（来源 hf-mirror 镜像，国内可达）。</li>
+    <li>下载完成后对应项显示 <span class="tag ok">已下载</span>。</li>
+    <li>重启应用（或继续使用），AI 功能自动启用；未下载的模型对应功能自动降级。</li>
+  </ol>
+</div>
+
+<!-- ============ 使用 ============ -->
+<h2>三、使用</h2>
+
+<h3>3.1 界面导航</h3>
+<div class="ui">
+  <div class="bar">
+    <span class="brand">像素蛋糕</span>
+    <span>导入照片</span><span>导出</span><span>关于</span>
+    <span style="margin-left:auto">v0.1.0</span>
+  </div>
+  <div class="body">
+    <div class="col side">
+      <div class="ui-item">项目列表</div>
+      <div class="ui-item">照片列表</div>
+      <div class="ui-item" style="margin-top:8px">导入路径输入</div>
+    </div>
+    <div class="col mid">
+      <div class="ui-canvas">📷 画布（预览区）</div>
+    </div>
+    <div class="col right">
+      <div class="ui-item">中性灰磨皮</div>
+      <div class="ui-item">AI 美型</div>
+      <div class="ui-item">AI 追色</div>
+      <div class="ui-item">祛瑕</div>
+      <div class="ui-item">基础调色</div>
+      <div class="ui-item">滤镜</div>
+      <div class="ui-item hl">导出</div>
+    </div>
+  </div>
+  <div class="status"><span>当前：未选择照片</span><span>本地 GPU 推理</span></div>
+</div>
+<p class="caption">界面总览：顶部菜单栏 · 左侧项目/照片 · 中央画布 · 右侧编辑面板 · 底部状态栏</p>
+
+<h3>3.2 基本流程</h3>
+<div class="card">
+  <ol class="steps">
+    <li><b>新建项目</b>：左侧顶部输入客片组名称 → 点击「新建项目」。</li>
+    <li><b>导入照片</b>：在导入框输入照片路径（多个用英文逗号分隔，支持 <code>.cr2 .arw .nef .dng .jpg .png</code> 等）→ 点击「导入照片」。</li>
+    <li><b>选择照片</b>：在照片列表点击要编辑的照片。</li>
+    <li><b>编辑</b>：在右侧面板调整参数，<b>编辑即自动预览</b>（无需手动刷新）。</li>
+    <li><b>导出</b>：点击「导出」输出 16bit TIFF 成品。</li>
+  </ol>
+</div>
+
+<h3>3.3 功能速查</h3>
+
+<div class="card">
+  <h3>🧱 中性灰磨皮</h3>
+  <ul>
+    <li><b>启用</b>后拖动 <b>平整 ka</b>（皮肤平滑）与 <b>立体 kb</b>（保留光影）。</li>
+    <li>模式：<code>平整+立体</code>（推荐）/<code>仅平整</code>/<code>仅立体</code>。</li>
+    <li>已下载 GPEN 模型时，ka 强度会走 GPEN 皮肤增强。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>🎯 AI 美型</h3>
+  <ul>
+    <li><b>启用</b>后拖动 <b>瘦脸</b>（0–100）调整液化强度。</li>
+    <li>需已下载 SCRFD + 2DFAN4 模型；未下载时自动回退为 5 点大眼。</li>
+    <li>瘦身 / 天鹅颈 / 面部丰盈为规划功能，暂未启用。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>🎨 AI 追色</h3>
+  <ul>
+    <li><b>启用</b>后填写<b>参考样片路径</b>（想要的颜色风格图片）。</li>
+    <li>选择模式：<code>和谐</code>（保守）/ <code>极致</code>（强烈）。</li>
+    <li>引擎会分割皮肤区域，把样片肤色迁移到照片，不动背景 / 唇色。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>🩹 祛瑕</h3>
+  <ul>
+    <li>选择<b>类型</b>（祛痣 / 纹身 / 背景 / 牙齿）→ 点击「绘制祛瑕区域」。</li>
+    <li>在画布上<b>点击</b>逐个添加多边形顶点，≥3 点后「完成区域」。</li>
+    <li>区域出现在列表，可删除重画。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>🎛️ 基础调色 · 🌈 滤镜 · 导出</h3>
+  <ul>
+    <li><b>调色</b>：曝光 / 对比度 / 色温 / 色调 / 饱和度 / 颗粒 / 暗角。</li>
+    <li><b>滤镜</b>：选择预设（暖色 / 冷色 / 黑白 / 鲜艳）+ 强度。</li>
+    <li><b>导出</b>：顶栏或右侧「导出（全分辨率）」输出 16bit TIFF 到原图旁。</li>
+  </ul>
+</div>
+
+<!-- ============ 卸载 ============ -->
+<h2>四、卸载</h2>
+
+<h3>4.1 标准卸载</h3>
+<div class="card">
+  <ol class="steps">
+    <li>打开 <b>Windows 设置 → 应用 → 已安装的应用</b>，找到「像素蛋糕」。</li>
+    <li>点击「卸载」，确认后运行卸载程序，删除程序文件与快捷方式。</li>
+    <li>也可在开始菜单右键「像素蛋糕」→「卸载」。</li>
+  </ol>
+</div>
+
+<h3>4.2 清理数据（可选）</h3>
+<div class="card danger">
+  <p>卸载程序<b>不会</b>删除你的数据（照片 / 编辑参数 / 模型）。如需彻底清理：</p>
+  <ol class="steps">
+    <li>在文件资源管理器地址栏输入 <code>%APPDATA%\com.pixcake.desktop</code> 回车。</li>
+    <li>删除该目录（内含 <code>pixcake.db</code>、<code>libraries</code>、<code>models</code>）。</li>
+    <li>删除桌面快捷方式（如卸载后残留）。</li>
+  </ol>
+  <p style="font-size:13px"><span class="tag warn">注意</span>此操作不可恢复，请先备份需要的照片数据。</p>
+</div>
+
+<div class="card info" style="margin-top:32px">
+  <p style="margin:0">📄 本文档随开发进度更新。如遇问题，请提供错误提示与操作步骤反馈。</p>
+</div>
+
+</div>
+</body>
+</html>
