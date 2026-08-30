@@ -192,12 +192,12 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
     let mut img = decode_auto(&req.raw_path, &bytes).map_err(|e| format!("解码失败: {e}"))?;
 
-    // 预览模式：缩小到代理尺寸（最长边 1600px），显著提升编辑响应速度；
+    // 预览模式：缩小到代理尺寸（最长边可配置，默认 1600px），显著提升编辑响应速度；
     // 导出模式保持全分辨率。
     if req.scope == Scope::Preview {
-        let max_edge = img.width.max(img.height);
-        if max_edge > 1600 {
-            let scale = 1600.0 / max_edge as f32;
+        let max_edge = req.preview_max_edge.unwrap_or(1600).max(320);
+        if img.width.max(img.height) > max_edge {
+            let scale = max_edge as f32 / img.width.max(img.height) as f32;
             let w = ((img.width as f32 * scale).round() as u32).max(1);
             let h = ((img.height as f32 * scale).round() as u32).max(1);
             img = resize_bilinear(&img, w, h);
@@ -283,15 +283,42 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     // 4. 16bit 全链路处理
     let result = process(&img, &pipeline);
 
-    // 5. 导出：预览仅输出 8bit PNG（小图，快）；导出输出 16bit TIFF + PNG（全分辨率）
-    let out_path = format!("{}.out.tiff", req.raw_path);
+    // 5. 导出：预览仅输出 8bit PNG（小图，快）；导出输出 16bit TIFF + PNG（全分辨率）。
+    //    导出目录可选：`req.export_dir` 指定时写入该目录，否则与源文件同目录。
+    let src_stem = Path::new(&req.raw_path)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "output".into());
+    let out_ext = if req.export_format.as_deref() == Some("png") {
+        "png"
+    } else {
+        "tiff"
+    };
+    let out_path = match &req.export_dir {
+        Some(dir) if !dir.trim().is_empty() => {
+            std::fs::create_dir_all(dir).map_err(|e| format!("创建导出目录失败: {e}"))?;
+            Path::new(dir)
+                .join(format!("{src_stem}.out.{out_ext}"))
+                .to_string_lossy()
+                .into_owned()
+        }
+        _ => format!("{}.out.{out_ext}", req.raw_path),
+    };
+    // PNG 预览始终写在源文件旁（read_preview 依此读取）。
     let png_path = format!("{}.out.png", req.raw_path);
+    let export_png = req.export_format.as_deref() == Some("png");
     if req.scope == Scope::Preview {
         let png = encode_png(&result);
         std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
     } else {
-        let tiff = encode_tiff(&result);
-        std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
+        if export_png {
+            // 仅 PNG 导出：全分辨率 8bit PNG（无 16bit TIFF）。
+            let png = encode_png(&result);
+            std::fs::write(&out_path, &png).map_err(|e| format!("写导出文件失败: {e}"))?;
+        } else {
+            let tiff = encode_tiff(&result);
+            std::fs::write(&out_path, &tiff).map_err(|e| format!("写导出文件失败: {e}"))?;
+        }
         let png = encode_png(&result);
         std::fs::write(&png_path, &png).map_err(|e| format!("写预览文件失败: {e}"))?;
     }

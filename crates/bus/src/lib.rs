@@ -206,6 +206,15 @@ pub struct EngineRequest {
     pub raw_path: String,
     pub recipe: Recipe,
     pub scope: Scope,
+    /// 导出目录。`None` = 与源文件同目录（历史行为）；`Some(dir)` = 导出到指定目录。
+    #[serde(default)]
+    pub export_dir: Option<String>,
+    /// 预览最长边（px）。`None` = 默认 1600。
+    #[serde(default)]
+    pub preview_max_edge: Option<u32>,
+    /// 导出格式：`"tiff"`（默认，16bit TIFF + PNG 预览）| `"png"`（8bit PNG）。
+    #[serde(default)]
+    pub export_format: Option<String>,
 }
 
 /// 引擎 → UI：进度/结果事件（文档 §7）。

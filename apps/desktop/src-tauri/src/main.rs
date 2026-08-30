@@ -10,8 +10,11 @@ mod state;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::create_project,
+            commands::open_project,
             commands::list_projects,
             commands::import_photos,
             commands::list_photos,
@@ -21,6 +24,9 @@ fn main() {
             commands::read_preview,
             commands::save_preset_cmd,
             commands::list_presets_cmd,
+            commands::get_settings,
+            commands::save_setting,
+            commands::reveal_in_explorer,
             models::list_model_packages_cmd,
             models::download_model_cmd,
         ])

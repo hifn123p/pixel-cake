@@ -289,6 +289,29 @@ impl Store {
         )?;
         Ok(())
     }
+
+    /// 读取一条设置（不存在返回 `None`）。
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT value FROM setting WHERE key = ?1")?;
+        let mut rows = stmt.query(params![key])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(row.get(0)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// 写入一条设置（upsert）。
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO setting(key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )?;
+        Ok(())
+    }
 }
 
 fn row_to_photo(r: &rusqlite::Row<'_>) -> SqlResult<Photo> {
@@ -332,6 +355,8 @@ CREATE TABLE IF NOT EXISTS preset(
 CREATE TABLE IF NOT EXISTS model(
   id TEXT PRIMARY KEY, name TEXT, path TEXT,
   version TEXT, hash TEXT, enabled INTEGER);
+CREATE TABLE IF NOT EXISTS setting(
+  key TEXT PRIMARY KEY, value TEXT);
 "#;
 
 #[cfg(test)]

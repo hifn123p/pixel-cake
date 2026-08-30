@@ -108,6 +108,9 @@
     border-bottom: 1px solid var(--line);
   }
   .ui .bar .brand { color: var(--brand); font-weight: 700; }
+  .ui .bar .grp { color: var(--sub); opacity: .85; font-size: 11px; }
+  .ui .bar .btn { background: var(--panel); border-radius: 4px; padding: 2px 8px; }
+  .ui .bar .btn.hl { background: var(--brand); color: #fff; }
   .ui .body {
     display: flex;
     min-height: 220px;
@@ -116,9 +119,10 @@
     padding: 8px;
     color: var(--sub);
   }
-  .ui .col.side { width: 120px; background: var(--panel); border-right: 1px solid var(--line); }
+  .ui .col.side { width: 130px; background: var(--panel); border-right: 1px solid var(--line); }
   .ui .col.mid { flex: 1; background: #0d0e11; display: flex; align-items: center; justify-content: center; }
-  .ui .col.right { width: 150px; background: var(--panel); border-left: 1px solid var(--line); }
+  .ui .col.right { width: 160px; background: var(--panel); border-left: 1px solid var(--line); }
+  .ui .ui-title { font-size: 10px; letter-spacing: 1px; color: var(--sub); padding: 4px 2px; }
   .ui .ui-row { padding: 4px 6px; margin: 2px 0; border-radius: 4px; background: var(--panel2); color: var(--ink); }
   .ui .ui-item { padding: 3px 6px; margin: 3px 0; border-radius: 4px; background: var(--panel2); }
   .ui .ui-item.hl { background: var(--brand); color: #fff; }
@@ -128,6 +132,24 @@
 
   .fig-row { display: flex; gap: 12px; flex-wrap: wrap; }
   .fig-row .fig { flex: 1; min-width: 200px; }
+
+  /* 对话框示意图 */
+  .dlg {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    padding: 10px;
+    width: 240px;
+    display: inline-block;
+    vertical-align: top;
+    margin: 8px;
+  }
+  .dlg h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink); text-align: center; }
+  .dlg .dlg-item { padding: 4px 8px; margin: 3px 0; border-radius: 4px; background: var(--panel2); font-size: 12px; color: var(--sub); }
+  .dlg .dlg-item.hl { background: rgba(0,184,212,.15); color: var(--brand2); }
+  .dlg .dlg-btns { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+  .dlg .dlg-btns span { padding: 2px 10px; border-radius: 4px; font-size: 11px; background: var(--panel2); color: var(--sub); }
+  .dlg .dlg-btns span.ok { background: var(--brand); color: #fff; }
 </style>
 </head>
 <body>
@@ -136,7 +158,7 @@
 <header class="hero">
   <h1>🍰 像素蛋糕 · 操作手册</h1>
   <p>本地 AI 修图客户端（Windows 11）</p>
-  <p>版本 0.1.0 · 安装 / 部署 / 使用 / 卸载</p>
+  <p>版本 0.2.0 · 安装 / 部署 / 使用 / 卸载</p>
 </header>
 
 <!-- ============ 安装 ============ -->
@@ -173,7 +195,7 @@
   <p>首次启动后应用会创建数据目录并初始化数据库：</p>
   <table>
     <tr><th>路径</th><th>用途</th></tr>
-    <tr><td><code>%APPDATA%\com.pixcake.desktop\pixcake.db</code></td><td>项目 / 照片 / 编辑参数（SQLite）</td></tr>
+    <tr><td><code>%APPDATA%\com.pixcake.desktop\pixcake.db</code></td><td>项目 / 照片 / 编辑参数 / 设置（SQLite）</td></tr>
     <tr><td><code>%APPDATA%\com.pixcake.desktop\libraries\</code></td><td>客片组目录</td></tr>
     <tr><td><code>%APPDATA%\com.pixcake.desktop\models\</code></td><td>AI 模型文件（应用内下载）</td></tr>
   </table>
@@ -210,14 +232,23 @@
 <div class="ui">
   <div class="bar">
     <span class="brand">像素蛋糕</span>
-    <span>导入照片</span><span>导出</span><span>关于</span>
-    <span style="margin-left:auto">v0.1.0</span>
+    <span class="grp">文件</span>
+    <span class="btn">打开项目…</span><span class="btn">导入照片…</span>
+    <span class="btn">导出…</span><span class="btn">批量导出…</span>
+    <span class="grp">视图</span>
+    <span class="btn">设置…</span><span class="btn">关于</span>
+    <span style="margin-left:auto">v0.2.0</span>
   </div>
   <div class="body">
     <div class="col side">
-      <div class="ui-item">项目列表</div>
-      <div class="ui-item">照片列表</div>
-      <div class="ui-item" style="margin-top:8px">导入路径输入</div>
+      <div class="ui-title">项目</div>
+      <div class="ui-item hl">客片 A</div>
+      <div class="ui-item">客片 B</div>
+      <div class="ui-item" style="margin-top:8px">＋ 打开照片文件夹…</div>
+      <div class="ui-title" style="margin-top:8px">照片</div>
+      <div class="ui-item">IMG_1234.cr2</div>
+      <div class="ui-item">IMG_1235.arw</div>
+      <div class="ui-item">IMG_1236.jpg</div>
     </div>
     <div class="col mid">
       <div class="ui-canvas">📷 画布（预览区）</div>
@@ -229,22 +260,48 @@
       <div class="ui-item">祛瑕</div>
       <div class="ui-item">基础调色</div>
       <div class="ui-item">滤镜</div>
-      <div class="ui-item hl">导出</div>
+      <div class="ui-item hl">导出（全分辨率）</div>
+      <div class="ui-item">预设</div>
+      <div class="ui-item">模型下载</div>
     </div>
   </div>
-  <div class="status"><span>当前：未选择照片</span><span>本地 GPU 推理</span></div>
+  <div class="status"><span>当前：IMG_1234.cr2</span><span>本地 GPU 推理</span></div>
 </div>
-<p class="caption">界面总览：顶部菜单栏 · 左侧项目/照片 · 中央画布 · 右侧编辑面板 · 底部状态栏</p>
+<p class="caption">界面总览：顶部菜单栏（文件 / 视图分组）· 左侧项目与照片 · 中央画布 · 右侧编辑面板 · 底部状态栏</p>
 
 <h3>3.2 基本流程</h3>
 <div class="card">
   <ol class="steps">
-    <li><b>新建项目</b>：左侧顶部输入客片组名称 → 点击「新建项目」。</li>
-    <li><b>导入照片</b>：在导入框输入照片路径（多个用英文逗号分隔，支持 <code>.cr2 .arw .nef .dng .jpg .png</code> 等）→ 点击「导入照片」。</li>
-    <li><b>选择照片</b>：在照片列表点击要编辑的照片。</li>
+    <li><b>打开项目</b>（推荐）：菜单「文件 → 打开项目…」，或左侧「打开照片文件夹…」，在<b>系统目录对话框</b>中选中存放照片的文件夹，应用自动建项目并导入全部 RAW / JPEG / PNG。</li>
+    <li><b>新建项目</b>：左侧顶部输入客片组名称 → 点击「新建」。</li>
+    <li><b>导入照片</b>：菜单「文件 → 导入照片…」用<b>系统文件对话框</b>多选照片（支持 <code>.cr2 .arw .nef .dng .jpg .png</code> 等）。</li>
+    <li><b>选择照片</b>：在左侧照片列表点击要编辑的照片。</li>
     <li><b>编辑</b>：在右侧面板调整参数，<b>编辑即自动预览</b>（无需手动刷新）。</li>
-    <li><b>导出</b>：点击「导出」输出 16bit TIFF 成品。</li>
+    <li><b>导出</b>：菜单「导出…」或右侧「导出（全分辨率）」，选择导出目录后输出 16bit TIFF 成品。</li>
   </ol>
+</div>
+
+<div class="fig-row">
+  <div class="fig">
+    <div class="dlg">
+      <h4>打开项目（目录对话框）</h4>
+      <div class="dlg-item hl">D:\旅行\2026-08-30 丽江</div>
+      <div class="dlg-item">…\2026-07 大理</div>
+      <div class="dlg-item">…\2026-06 川西</div>
+      <div class="dlg-btns"><span>取消</span><span class="ok">选择文件夹</span></div>
+    </div>
+    <p class="caption">选文件夹即建项目，自动导入</p>
+  </div>
+  <div class="fig">
+    <div class="dlg">
+      <h4>导入照片（文件对话框）</h4>
+      <div class="dlg-item hl">IMG_1234.cr2</div>
+      <div class="dlg-item hl">IMG_1235.arw</div>
+      <div class="dlg-item">IMG_1236.jpg</div>
+      <div class="dlg-btns"><span>取消</span><span class="ok">打开</span></div>
+    </div>
+    <p class="caption">支持多选，可全选文件夹</p>
+  </div>
 </div>
 
 <h3>3.3 功能速查</h3>
@@ -270,7 +327,7 @@
 <div class="card">
   <h3>🎨 AI 追色</h3>
   <ul>
-    <li><b>启用</b>后填写<b>参考样片路径</b>（想要的颜色风格图片）。</li>
+    <li><b>启用</b>后点击<b>「选择…」</b>按钮，用系统对话框挑选参考样片（或手动输入路径）。</li>
     <li>选择模式：<code>和谐</code>（保守）/ <code>极致</code>（强烈）。</li>
     <li>引擎会分割皮肤区域，把样片肤色迁移到照片，不动背景 / 唇色。</li>
   </ul>
@@ -290,8 +347,24 @@
   <ul>
     <li><b>调色</b>：曝光 / 对比度 / 色温 / 色调 / 饱和度 / 颗粒 / 暗角。</li>
     <li><b>滤镜</b>：选择预设（暖色 / 冷色 / 黑白 / 鲜艳）+ 强度。</li>
-    <li><b>导出</b>：顶栏或右侧「导出（全分辨率）」输出 16bit TIFF 到原图旁。</li>
+    <li><b>导出</b>：菜单「导出…」或右侧「导出（全分辨率）」，在系统对话框中选择导出目录；「批量导出…」把当前项目全部照片按统一风格导出。</li>
+    <li>导出格式可在设置中选择：<code>16bit TIFF</code>（默认，无损）或 <code>8bit PNG</code>（通用）。</li>
+    <li>导出完成后可点击右侧 <code>📂</code> 按钮，在资源管理器中定位成品文件。</li>
   </ul>
+</div>
+
+<h3>3.4 设置面板</h3>
+<div class="card">
+  <p>菜单「视图 → 设置…」打开设置面板，设置即时生效并自动保存：</p>
+  <table>
+    <tr><th>设置项</th><th>选项</th><th>说明</th></tr>
+    <tr><td>界面主题</td><td>深色 / 浅色</td><td>切换整套界面配色</td></tr>
+    <tr><td>预览尺寸</td><td>小 / 中 / 大 / 超大</td><td>预览代理图最长边（800–2400px），越大越清晰、越耗性能</td></tr>
+    <tr><td>导出格式</td><td>16bit TIFF / 8bit PNG</td><td>导出的默认文件格式</td></tr>
+    <tr><td>默认导出目录</td><td>浏览…</td><td>留空则导出到源照片旁</td></tr>
+    <tr><td>默认导入目录</td><td>浏览…</td><td>打开项目 / 导入 / 选参考图对话框的起始目录</td></tr>
+  </table>
+  <p style="font-size:13px"><span class="tag ok">提示</span>设置保存在 <code>pixcake.db</code> 的 <code>setting</code> 表中，重开应用后仍然生效。</p>
 </div>
 
 <!-- ============ 卸载 ============ -->
@@ -308,7 +381,7 @@
 
 <h3>4.2 清理数据（可选）</h3>
 <div class="card danger">
-  <p>卸载程序<b>不会</b>删除你的数据（照片 / 编辑参数 / 模型）。如需彻底清理：</p>
+  <p>卸载程序<b>不会</b>删除你的数据（照片 / 编辑参数 / 模型 / 设置）。如需彻底清理：</p>
   <ol class="steps">
     <li>在文件资源管理器地址栏输入 <code>%APPDATA%\com.pixcake.desktop</code> 回车。</li>
     <li>删除该目录（内含 <code>pixcake.db</code>、<code>libraries</code>、<code>models</code>）。</li>
