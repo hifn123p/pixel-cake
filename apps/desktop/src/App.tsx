@@ -281,25 +281,92 @@ export default function App() {
     }
   }
 
+  // ── 键盘快捷键（常规桌面应用体验）────────────────
+  // 用 ref 保存最新闭包，effect 只装一次监听。
+  const shortcutsRef = useRef({
+    openProject,
+    importPhotos,
+    exportPhoto,
+    exportAll,
+    revealResult,
+  });
+  shortcutsRef.current = {
+    openProject,
+    importPhotos,
+    exportPhoto,
+    exportAll,
+    revealResult,
+  };
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const mod = e.ctrlKey || e.metaKey;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const inField = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      const s = shortcutsRef.current;
+
+      // Esc：关闭弹窗 / 取消绘制
+      if (e.key === "Escape") {
+        setAbout(false);
+        setSettingsOpen(false);
+        if (inField) (e.target as HTMLElement).blur();
+        return;
+      }
+      if (!mod) return;
+
+      switch (e.key.toLowerCase()) {
+        case "o": // Ctrl+O 打开项目
+          e.preventDefault();
+          s.openProject();
+          break;
+        case "i": // Ctrl+I 导入照片
+          if (inField) return;
+          e.preventDefault();
+          s.importPhotos();
+          break;
+        case "e": // Ctrl+E 导出当前照片（Shift=批量导出）
+          if (inField) return;
+          e.preventDefault();
+          if (e.shiftKey) s.exportAll();
+          else s.exportPhoto();
+          break;
+        case ",": // Ctrl+, 设置
+          e.preventDefault();
+          setSettingsOpen(true);
+          break;
+        case "r": // Ctrl+R 定位导出结果
+          if (inField) return;
+          e.preventDefault();
+          s.revealResult();
+          break;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="menubar">
         <span className="brand">像素蛋糕</span>
         <nav className="menu">
           <span className="menu-group">文件</span>
-          <button onClick={openProject}>打开项目…</button>
-          <button onClick={importPhotos} disabled={!projectId}>
+          <button onClick={openProject} title="Ctrl+O">
+            打开项目…
+          </button>
+          <button onClick={importPhotos} disabled={!projectId} title="Ctrl+I">
             导入照片…
           </button>
-          <button disabled={!photo} onClick={exportPhoto}>
+          <button disabled={!photo} onClick={exportPhoto} title="Ctrl+E">
             导出…
           </button>
-          <button disabled={!projectId || photos.length === 0} onClick={exportAll}>
+          <button disabled={!projectId || photos.length === 0} onClick={exportAll} title="Ctrl+Shift+E">
             批量导出…
           </button>
           <span className="menu-sep" />
           <span className="menu-group">视图</span>
-          <button onClick={() => setSettingsOpen(true)}>设置…</button>
+          <button onClick={() => setSettingsOpen(true)} title="Ctrl+,">
+            设置…
+          </button>
           <button onClick={() => setAbout(true)}>关于</button>
         </nav>
         <span className="menubar-right">
