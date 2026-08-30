@@ -107,7 +107,19 @@ scripts/      CI 图标生成
 | M3 AI 追色 | ✅ |
 | M4 美型 / 祛瑕 | ✅ |
 | M5 16bit 全链路 + 导出 | ✅ |
-| M6 打磨（设置 / 原生对话框 / 主题 / WebGL2 实时预览 / UX） | 🔶 进行中 |
+| M6 打磨（设置 / 原生对话框 / 主题 / WebGL2 实时预览 / UX） | ✅ 主要功能 / 面板 / 菜单栏 / 状态栏 / 文档全完成 |
+| AI 模型实机验证（4 个 ONNX 输入输出约定） | ✅ 2026-08-30 实测，修复 SCRFD 展平布局 + 2DFAN4 输出名（v0.2.1） |
+
+> 剩余可选项（非阻塞）：预设市场（在线下载预设 LUT）、性能调优（WebGL2 预览替代 PNG 轮询）、`.cube` 滤镜库扩充、真机 CUDA 目视验收。
+
+## 发布
+
+| 版本 | 链接 | 说明 |
+|---|---|---|
+| **v0.2.1**（推荐） | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.1 | 修复 SCRFD / 2DFAN4 模型约定，AI 功能（磨皮 / 美型 / 祛瑕 / 追色）完整可用 |
+| v0.2.0 | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.0 | 含 SCRFD 解码 bug，AI 功能会降级跳过，**不建议使用** |
+
+每个 Release 提供 `install.exe`（NSIS 安装包）与 `pixel-cake.exe`（便携版），由 GitHub Actions CI 自动产出。
 
 ## 许可证
 
