@@ -2,10 +2,15 @@
 //!
 //! 后处理参考 FaceFusion / InsightFace 的 SCRFD 解码逻辑：
 //! 3 个特征尺度（stride 8/16/32），distance-based bbox 与关键点回归，
-//! 输出 9 个张量（score/bbox/kps 各 3 尺度），最后 NMS 去重。
+//! 最后 NMS 去重。
 //!
-//! 注意：模型输入输出约定（输出名、通道顺序、归一化）为 InsightFace SCRFD
-//! 标准约定，实际运行需模型文件就位后验证微调。
+//! 输入输出约定（已实测验证，模型文件 Jonny001/Models-Pack-01 scrfd_2.5g.onnx）：
+//! - 输入：BGR，`(x*255-127.5)/128` 归一化到 `[-1,1]`，640×640，输入名 `input`。
+//! - 输出：9 个张量，**输出名按序 `"0".."8"`**（非 `score_8` 等命名），
+//!   每尺度展平为 `[N, C]` 布局（N = H·W·2，`[h, w, anchor]` 行优先）：
+//!   `0/1/2` = score（[N,1]），`3/4/5` = bbox（[N,4]），`6/7/8` = kps（[N,10]）。
+//!   bbox/kps 为 distance 回归值（单位 stride），score 已是 sigmoid 概率。
+//! - 实测：hwa 展平序（`(hi*W+wi)*2+a`）能解出正确人脸框。
 
 use ndarray::Array4;
 use ort::value::Tensor;
@@ -53,10 +58,9 @@ impl FaceDetector {
         let size = self.input_size;
         let tensor = scrfd_preprocess(img, size)?;
 
-        let output_names = [
-            "score_8", "score_16", "score_32", "bbox_8", "bbox_16", "bbox_32", "kps_8",
-            "kps_16", "kps_32",
-        ];
+        // 实测：该模型输出名是 "0".."8"（0-2=score, 3-5=bbox, 6-8=kps，按 stride 8/16/32 分组），
+        // 且每尺度是展平 [N, C] 布局（N = H*W*2，[h, w, anchor] 行优先），不是 NCHW。
+        let output_names = ["0", "1", "2", "3", "4", "5", "6", "7", "8"];
         let outputs = self.session.run("input", tensor, &output_names)?;
 
         let ratio_x = img.width as f32 / size as f32;
@@ -68,28 +72,32 @@ impl FaceDetector {
             let (_bbox_shape, bbox_data) = &outputs[i + 3];
             let (_kps_shape, kps_data) = &outputs[i + 6];
 
-            // score: [1, 2, H, W]
-            let h = score_shape[2];
-            let w = score_shape[3];
+            // 展平布局：N = H*W*2，行优先 [h, w, anchor]
+            let h = (size / stride) as usize;
+            let w = (size / stride) as usize;
+            debug_assert_eq!(score_shape.len(), 2);
+            debug_assert_eq!(score_shape[0], h * w * NUM_ANCHORS);
 
             for ah in 0..h {
                 for aw in 0..w {
-                    let cx = (aw as f32 + 0.5) * stride as f32;
-                    let cy = (ah as f32 + 0.5) * stride as f32;
+                    let base = (ah * w + aw) * NUM_ANCHORS;
 
                     for a in 0..NUM_ANCHORS {
-                        let s = score_data[nchw_idx(2, h, w, a, ah, aw)];
+                        let n = base + a;
+                        let s = score_data[n];
                         if s < self.score_threshold {
                             continue;
                         }
 
-                        // bbox 通道：anchor a 的 [left, top, right, bottom]
-                        let b0 = a * 4;
-                        let left = bbox_data[nchw_idx(8, h, w, b0, ah, aw)] * stride as f32;
-                        let top = bbox_data[nchw_idx(8, h, w, b0 + 1, ah, aw)] * stride as f32;
-                        let right = bbox_data[nchw_idx(8, h, w, b0 + 2, ah, aw)] * stride as f32;
-                        let bottom = bbox_data[nchw_idx(8, h, w, b0 + 3, ah, aw)] * stride as f32;
+                        // bbox 通道：anchor a 的 [left, top, right, bottom]（distance 回归，单位 stride）
+                        let b0 = n * 4;
+                        let left = bbox_data[b0] * stride as f32;
+                        let top = bbox_data[b0 + 1] * stride as f32;
+                        let right = bbox_data[b0 + 2] * stride as f32;
+                        let bottom = bbox_data[b0 + 3] * stride as f32;
 
+                        let cx = (aw as f32 + 0.5) * stride as f32;
+                        let cy = (ah as f32 + 0.5) * stride as f32;
                         let bbox = [
                             (cx - left) * ratio_x,
                             (cy - top) * ratio_y,
@@ -97,14 +105,12 @@ impl FaceDetector {
                             (cy + bottom) * ratio_y,
                         ];
 
-                        // kps 通道：anchor a 的 5 点 (dx, dy)
-                        let k0 = a * 10;
+                        // kps 通道：anchor a 的 5 点 (dx, dy)（distance 回归，单位 stride）
+                        let k0 = n * 10;
                         let mut landmarks = [[0.0f32; 2]; 5];
                         for k in 0..5 {
-                            let dx =
-                                kps_data[nchw_idx(20, h, w, k0 + k * 2, ah, aw)] * stride as f32;
-                            let dy = kps_data[nchw_idx(20, h, w, k0 + k * 2 + 1, ah, aw)]
-                                * stride as f32;
+                            let dx = kps_data[k0 + k * 2] * stride as f32;
+                            let dy = kps_data[k0 + k * 2 + 1] * stride as f32;
                             landmarks[k] = [(cx + dx) * ratio_x, (cy + dy) * ratio_y];
                         }
 
@@ -140,12 +146,6 @@ fn scrfd_preprocess(img: &ImageBuf, size: u32) -> Result<Tensor<f32>, String> {
     let arr = Array4::from_shape_vec((1, 3, size as usize, size as usize), data)
         .map_err(|e| e.to_string())?;
     Tensor::from_array(arr).map_err(|e| e.to_string())
-}
-
-/// NCHW（batch=1）行优先索引：`data[(ci * H + hi) * W + wi]`。
-#[inline]
-fn nchw_idx(_c: usize, h: usize, w: usize, ci: usize, hi: usize, wi: usize) -> usize {
-    (ci * h + hi) * w + wi
 }
 
 /// 贪心 NMS：按 score 降序，抑制 IoU 超过阈值的重叠框。
@@ -193,10 +193,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nchw_indexing() {
-        // [1, 2, 3, 4]：ci=1, hi=2, wi=3 → (1*3 + 2)*4 + 3 = 23
-        assert_eq!(nchw_idx(2, 3, 4, 1, 2, 3), 23);
-        assert_eq!(nchw_idx(2, 3, 4, 0, 0, 0), 0);
+    fn flat_hwa_indexing() {
+        // 展平 [h, w, anchor] 布局：h=2, w=3, anchors=2，n = (hi*w+wi)*2 + a
+        // (hi=1, wi=2, a=1) → (1*3+2)*2+1 = 11
+        let h = 2usize;
+        let w = 3usize;
+        let anchors = 2usize;
+        let idx = |hi: usize, wi: usize, a: usize| (hi * w + wi) * anchors + a;
+        assert_eq!(idx(1, 2, 1), 11);
+        assert_eq!(idx(0, 0, 0), 0);
+        assert_eq!(idx(1, 2, 0), 10);
+        // 总数 = h*w*anchors
+        assert_eq!(h * w * anchors, 12);
     }
 
     #[test]

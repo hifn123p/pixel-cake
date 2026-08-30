@@ -2,6 +2,8 @@
 //!
 //! 模型文件不入库，应用内按需下载到 `app_data_dir/models/`。
 //! 清单硬编码在此，URL 使用 Hugging Face 镜像 hf-mirror.com（国内可达）。
+//! size_bytes 为实测文件大小（2026-08-30 验证：4 个 URL 均可达，
+//! SCRFD/2DFAN4/BiSeNet/GPEN 输入输出约定与引擎代码一致）。
 
 use std::path::PathBuf;
 use std::sync::LazyLock;
@@ -16,28 +18,28 @@ pub static MODEL_PACKAGES: LazyLock<Vec<ModelSpec>> = LazyLock::new(|| {
         id: "scrfd_2.5g".into(),
         name: "人脸检测 SCRFD 2.5G".into(),
         url: "https://hf-mirror.com/Jonny001/Models-Pack-01/resolve/main/scrfd_2.5g.onnx".into(),
-        size_bytes: 3_400_000,
+        size_bytes: 3_295_067,
         purpose: "磨皮/美型第一步的人脸检测".into(),
     },
     ModelSpec {
         id: "bisenet_resnet_34".into(),
         name: "人脸解析 BiSeNet".into(),
         url: "https://hf-mirror.com/Jonny001/Models-Pack-01/resolve/main/bisenet_resnet_34.onnx".into(),
-        size_bytes: 51_000_000,
+        size_bytes: 93_632_546,
         purpose: "追色分区（皮肤/发/唇/背景）".into(),
     },
     ModelSpec {
         id: "2dfan4".into(),
         name: "人脸关键点 2DFAN4".into(),
         url: "https://hf-mirror.com/Jonny001/Models-Pack-01/resolve/main/2dfan4.onnx".into(),
-        size_bytes: 8_000_000,
+        size_bytes: 97_904_803,
         purpose: "美型液化的关键点检测".into(),
     },
     ModelSpec {
         id: "gpen_bfr_512".into(),
         name: "皮肤增强 GPEN".into(),
         url: "https://hf-mirror.com/Jonny001/Models-Pack-01/resolve/main/gpen_bfr_512.onnx".into(),
-        size_bytes: 280_000_000,
+        size_bytes: 284_340_240,
         purpose: "磨皮（皮肤平滑/增强）".into(),
     },
     ]

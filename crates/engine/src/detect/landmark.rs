@@ -2,10 +2,11 @@
 //!
 //! 后处理参考 FaceFusion `face_landmarker.py`：
 //! 以 bbox 做相似仿射裁剪到 256×256（scale=195/bbox_size，bbox 中心对齐），
-//! BGR + `/255` 归一化，输出 `landmarks_xyscore [1,68,3]`（x/y 值域 0..64），
+//! BGR + `/255` 归一化，输出 `landmarks [1,68,3]`（x/y 值域 0..64，实测验证），
 //! `/64*256` 映射回 256 空间后逆仿射回原图坐标。
 //!
-//! 注意：输入输出约定为 2DFAN4 标准，需模型文件就位后验证微调。
+//! 实测（Jonny001/Models-Pack-01 2dfan4.onnx）：输入名 `input`、输出名 `landmarks`，
+//! 另有一冗余输出 `heatmaps [1,68,64,64]`（本模块不消费）。
 
 use ndarray::Array4;
 use ort::value::Tensor;
@@ -39,8 +40,8 @@ impl Landmarker {
         // 2. 预处理：BGR + /255（[0,1]）
         let tensor = landmark_preprocess(&crop)?;
 
-        // 3. 前向
-        let outputs = self.session.run("input", tensor, &["landmarks_xyscore"])?;
+        // 3. 前向（实测输出名为 `landmarks`，非 `landmarks_xyscore`）
+        let outputs = self.session.run("input", tensor, &["landmarks"])?;
         let (_shape, data) = &outputs[0]; // [1, 68, 3]
 
         // 4. 后处理：x/y /64*256 → 逆仿射回原图
