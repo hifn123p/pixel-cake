@@ -157,8 +157,8 @@
 
 <header class="hero">
   <h1>🍰 像素蛋糕 · 操作手册</h1>
-  <p>本地 AI 修图客户端（Windows 11）</p>
-  <p>版本 0.2.1 · 安装 / 部署 / 使用 / 卸载</p>
+  <p>本地 AI 修图客户端（Windows 10 1809+ / Windows 11）</p>
+  <p>版本 0.2.2 · 安装 / 部署 / 使用 / 卸载 / 常见问题</p>
 </header>
 
 <!-- ============ 安装 ============ -->
@@ -168,14 +168,15 @@
 <div class="card info">
   <table>
     <tr><th>项目</th><th>要求</th></tr>
-    <tr><td>操作系统</td><td>Windows 10 / Windows 11（64 位）</td></tr>
-    <tr><td>GPU（AI 功能）</td><td>NVIDIA 显卡（推荐 RTX 30 系列及以上），驱动 ≥ 550 系列</td></tr>
+    <tr><td>操作系统</td><td>Windows 10 1809+ / Windows 11（64 位）</td></tr>
+    <tr><td>GPU（AI 功能）</td><td><b>NVIDIA 独显</b>（CUDA，最佳性能）或 <b>Intel / AMD 核显</b>（DirectML 加速）或 <b>无 GPU</b>（CPU 兜底，可跑但慢）</td></tr>
     <tr><td>运行库</td><td>Microsoft VC++ 运行库（<a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" style="color:var(--brand2)">下载</a>）</td></tr>
+    <tr><td>WebView2</td><td>v0.2.2 安装包内置离线安装器，无需手动装（v0.2.2 之前需自行安装）</td></tr>
     <tr><td>内存</td><td>≥ 8 GB</td></tr>
     <tr><td>磁盘</td><td>≥ 2 GB 可用空间（模型 + 照片数据另计）</td></tr>
   </table>
   <p style="font-size:13px;margin:8px 0 0">
-    <span class="tag warn">注意</span>AI 推理需要支持 CUDA 的 NVIDIA 驱动；无独显时应用仍可启动，AI 功能将自动降级（仅基础调色 / 手动美型可用）。
+    <span class="tag ok">提示</span>推理后端自动按 <b>NVIDIA CUDA → DirectX 12（DirectML，Intel/AMD 核显）→ CPU</b> 顺序降级，无需手动配置。NVIDIA 驱动 ≥ 550 系列时 CUDA 已自动满足（CUDA ≥ 13.2 / cuDNN ≥ 9.23 由驱动覆盖）。
   </p>
 </div>
 
@@ -237,7 +238,7 @@
     <span class="btn">导出…</span><span class="btn">批量导出…</span>
     <span class="grp">视图</span>
     <span class="btn">设置…</span><span class="btn">关于</span>
-    <span style="margin-left:auto">v0.2.1</span>
+    <span style="margin-left:auto">v0.2.2</span>
   </div>
   <div class="body">
     <div class="col side">
@@ -389,6 +390,43 @@
     <li>删除桌面快捷方式（如卸载后残留）。</li>
   </ol>
   <p style="font-size:13px"><span class="tag warn">注意</span>此操作不可恢复，请先备份需要的照片数据。</p>
+</div>
+
+<!-- ============ 常见问题 ============ -->
+<h2>五、常见问题</h2>
+
+<h3>5.1 安装时「WebView2 安装失败，错误代码 -2147219198」</h3>
+<div class="card alert">
+  <p><code>0x80040902</code> = 目标机 EdgeUpdate 注册表策略残留 / WebView2 残留文件损坏 / 杀软拦截，导致 NSIS 引导程序无法静默安装 WebView2。</p>
+  <p style="font-size:13px"><b>v0.2.2 已内置 WebView2 离线安装器</b>，对绝大多数情况可一次装好。若仍失败，按以下步骤清理系统残留后再重装：</p>
+  <ol class="steps">
+    <li><b>以管理员身份</b>打开 CMD（PowerShell 也可），依次执行：
+      <div class="card" style="margin:6px 0">
+        <code>reg delete "HKLM\SOFTWARE\Policies\Microsoft\EdgeUpdate" /f</code><br>
+        <code>reg delete "HKLM\SOFTWARE\Microsoft\EdgeUpdate" /f</code><br>
+        <code>reg delete "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate" /f</code>
+      </div>
+    </li>
+    <li>打开 <code>C:\Program Files (x86)\Microsoft\EdgeWebView</code>，<b>删除三个保护目录</b>：<code>edgecore</code>、<code>edgewebview</code>、<code>temp</code>（如无法直接删除需先用 DiskGenius 等工具强删）。</li>
+    <li>重启 Windows，再重新运行像素蛋糕安装包。</li>
+  </ol>
+  <p style="font-size:13px"><span class="tag ok">替代方案</span>手动下载 <a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/" style="color:var(--brand2)">WebView2 Evergreen 离线安装器</a>（约 150 MB），以管理员身份运行它，先把 WebView2 装好，再装像素蛋糕。</p>
+</div>
+
+<h3>5.2 启动后 AI 功能不生效（核显 / 无 GPU 机器）</h3>
+<div class="card">
+  <p>v0.2.2 起推理自动选择后端：</p>
+  <ul>
+    <li><b>NVIDIA 独显</b>：CUDA EP（最佳性能，需 NVIDIA 驱动 ≥ 550，CUDA/cuDNN 由驱动覆盖）。</li>
+    <li><b>Intel / AMD 核显 / 其他 DX12 GPU</b>：DirectML EP（Windows 10 1903+ / 11，硬件加速）。</li>
+    <li><b>无 GPU / 驱动异常</b>：CPU EP 兜底（可跑但慢，可能达不到实时）。</li>
+  </ul>
+  <p style="font-size:13px">若 AI 功能完全不生效：① 打开「模型下载」面板确认 4 个模型都显示「已下载」；② 用「设置 → 关于」查看应用是否正常加载模型；③ 更新显卡驱动到最新版（核显用户到主板/Intel/AMD 官网）。</p>
+</div>
+
+<h3>5.3 模型下载失败 / 下载卡住</h3>
+<div class="card">
+  <p>模型源在 hf-mirror 镜像。若仍无法下载：① 检查网络（浏览器能否打开镜像站）；② 重启应用后重试；③ 从 <a href="https://huggingface.co/facefusion/models" style="color:var(--brand2)">Hugging Face facefusion/models</a> 手动下载 4 个 ONNX（SCRFD / 2DFAN4 / BiSeNet / GPEN），放入 <code>%APPDATA%\com.pixcake.desktop\models\</code> 对应文件名即可。</p>
 </div>
 
 <div class="card info" style="margin-top:32px">

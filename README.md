@@ -1,8 +1,8 @@
 # 像素蛋糕（Pixel Cake）
 
-> 本地 AI 修图桌面客户端 · Windows 11 · 数据与推理全在本地
+> 本地 AI 修图桌面客户端 · Windows 10/11 · 数据与推理全在本地
 
-复刻「像素蛋糕」核心修图能力：**中性灰磨皮、AI 美型、祛瑕、AI 追色、基础调色、滤镜**。基于 Tauri 2 + Rust 构建，AI 推理经 ONNX Runtime（CUDA EP）在本地 NVIDIA GPU 上完成，无需联网、无需 Python。
+复刻「像素蛋糕」核心修图能力：**中性灰磨皮、AI 美型、祛瑕、AI 追色、基础调色、滤镜**。基于 Tauri 2 + Rust 构建，AI 推理经 ONNX Runtime 在本地 GPU 上完成（**NVIDIA CUDA / DirectX 12 核显 / CPU 自动降级**），无需联网、无需 Python。
 
 ## 特性
 
@@ -17,6 +17,8 @@
 - 🗂️ **打开照片文件夹** — 原生目录对话框选择文件夹，扫描建项目并自动导入
 - 🧩 **原生文件对话框** — 导入照片、追色参考样片、选择导出目录均为系统对话框
 - ⚙️ **设置面板** — 深/浅色主题、预览尺寸、导出格式（16bit TIFF / PNG）、默认目录
+- 🎯 **多 GPU 推理后端** — 推理自动按 **NVIDIA CUDA → DirectX 12（DirectML，Intel/AMD 核显与 N 卡）→ CPU** 顺序降级，无独显机器也能 GPU 加速
+- 🪟 **Windows 10 1809+ 兼容** — 兼容 Win10 / Win11，安装包内置 WebView2 离线安装器，无需联网/单独装
 - 🔒 **全本地** — 数据存 SQLite + 本地目录，AI 推理不离开你的 GPU
 
 ## 技术栈
@@ -53,7 +55,8 @@
 
 ## 环境要求
 
-- **运行**：Windows 10/11 + [VC++ 运行库](https://aka.ms/vs/17/release/vc_redist.x64.exe) + NVIDIA 驱动（CUDA ≥ 13.2 / cuDNN ≥ 9.23，由驱动版本覆盖）
+- **运行**：Windows 10 1809+ / Windows 11 + [VC++ 运行库](https://aka.ms/vs/17/release/vc_redist.x64.exe) + NVIDIA 驱动（如有 N 卡，CUDA ≥ 13.2 / cuDNN ≥ 9.23 由驱动覆盖；**无 N 卡时通过 DirectML 走核显，CPU 也能跑**）
+- **WebView2**：v0.2.2+ 安装包内置离线安装器，无需手动装
 - **开发**：Rust stable + Node.js 18+ + MSVC Build Tools
 
 ## 构建与运行
@@ -95,8 +98,10 @@ crates/
 apps/desktop/
   src-tauri/  Tauri 后端（IPC 命令 / 模型下载 / 事件转发 / 原生对话框）
   src/        React 前端（面板 / 画布 / 菜单栏 / 设置 / 状态栏）
-scripts/      CI 图标生成
+assets-logo/  真 logo 源图与生成脚本（不入库，开发者本地重新生成图标用）
 ```
+
+（图标文件 `apps/desktop/src-tauri/icons/` 已入库，含 6 尺寸 PNG + 多尺寸 ICO，CI 不再生成占位图。）
 
 ## 里程碑
 
@@ -109,6 +114,7 @@ scripts/      CI 图标生成
 | M5 16bit 全链路 + 导出 | ✅ |
 | M6 打磨（设置 / 原生对话框 / 主题 / WebGL2 实时预览 / UX） | ✅ 主要功能 / 面板 / 菜单栏 / 状态栏 / 文档全完成 |
 | AI 模型实机验证（4 个 ONNX 输入输出约定） | ✅ 2026-08-30 实测，修复 SCRFD 展平布局 + 2DFAN4 输出名（v0.2.1） |
+| **v0.2.2 平台兼容**（Win10 1809+ / 核显 DirectML 加速 / WebView2 离线内置 / 品牌 logo） | ✅ 2026-08-30 |
 
 > 剩余可选项（非阻塞）：预设市场（在线下载预设 LUT）、性能调优（WebGL2 预览替代 PNG 轮询）、`.cube` 滤镜库扩充、真机 CUDA 目视验收。
 
@@ -116,10 +122,11 @@ scripts/      CI 图标生成
 
 | 版本 | 链接 | 说明 |
 |---|---|---|
-| **v0.2.1**（推荐） | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.1 | 修复 SCRFD / 2DFAN4 模型约定，AI 功能（磨皮 / 美型 / 祛瑕 / 追色）完整可用 |
+| **v0.2.2**（推荐） | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.2 | 平台兼容：Win10 1809+ / 核显 DirectML 加速 / WebView2 离线内置 / 品牌 logo |
+| v0.2.1 | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.1 | 修复 SCRFD / 2DFAN4 模型约定，AI 功能（磨皮 / 美型 / 祛瑕 / 追色）完整可用 |
 | v0.2.0 | https://github.com/hifn123p/pixel-cake/releases/tag/v0.2.0 | 含 SCRFD 解码 bug，AI 功能会降级跳过，**不建议使用** |
 
-每个 Release 提供 `install.exe`（NSIS 安装包）与 `pixel-cake.exe`（便携版），由 GitHub Actions CI 自动产出。
+每个 Release 提供 `install.exe`（NSIS 安装包，v0.2.2 起内置 WebView2 离线安装器约 +127MB）与 `pixel-cake.exe`（便携版），由 GitHub Actions CI 自动产出。
 
 ## 许可证
 
