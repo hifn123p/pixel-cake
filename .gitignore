@@ -50,3 +50,9 @@ Desktop.ini
 # ===== 图标（icon.ico / icon.png / 16-256 多尺寸）已入库，CI 不再生成 =====
 # 源图与处理脚本在 assets-logo/（不入库，开发者本地生成新图标时用）
 assets-logo/
+
+# ===== 本地临时产物（不入库，含下载的 CI 安装包 / 模型验证 / Release 文案）=====
+dist-*/
+dist-release/
+model-verify/
+release_notes_*.md
