@@ -34,7 +34,7 @@ export const api = {
   submitRender: (
     photoId: string,
     recipe: Recipe,
-    scope: "preview" | "export",
+    scope: "base" | "preview" | "export",
     opts?: RenderOptions
   ) =>
     invoke<void>("submit_render", {
@@ -48,6 +48,9 @@ export const api = {
 
   /** 读取某照片的最新预览 PNG 为 base64（后端按 photo_id 查路径，安全）。 */
   readPreview: (photoId: string) => invoke<string>("read_preview", { photoId }),
+
+  /** 读取某照片的 WebGL 实时预览底图 PNG（仅解码、未调色）为 base64。 */
+  readBase: (photoId: string) => invoke<string>("read_base", { photoId }),
 
   /** 保存当前编辑参数为预设。 */
   savePreset: (name: string, recipe: Recipe) =>

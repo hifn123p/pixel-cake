@@ -164,6 +164,7 @@ pub async fn submit_render(
 ) -> Result<(), String> {
     let scope = match scope.as_str() {
         "export" => Scope::Export,
+        "base" => Scope::Base,
         _ => Scope::Preview,
     };
     // 查原图路径（引擎据此解码输入）
@@ -244,6 +245,24 @@ pub fn read_preview(state: State<AppState>, photo_id: String) -> Result<String, 
         .ok_or_else(|| "照片不存在".to_string())?;
     let png_path = format!("{}.out.png", photo.raw_path);
     let bytes = std::fs::read(&png_path).map_err(|e| format!("读取预览失败: {e}"))?;
+    Ok(base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        &bytes,
+    ))
+}
+
+/// 读取某照片的 WebGL 实时预览底图 PNG 为 base64（仅解码、未调色）。
+///
+/// 路径规则同 `read_preview`：前端只传 `photo_id`，后端查询拼接 `{raw_path}.base.png`。
+#[tauri::command]
+pub fn read_base(state: State<AppState>, photo_id: String) -> Result<String, String> {
+    let photo = state
+        .store
+        .get_photo(&photo_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "照片不存在".to_string())?;
+    let png_path = format!("{}.base.png", photo.raw_path);
+    let bytes = std::fs::read(&png_path).map_err(|e| format!("读取底图失败: {e}"))?;
     Ok(base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
         &bytes,

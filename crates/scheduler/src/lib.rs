@@ -172,7 +172,7 @@ async fn run_one(
             let _ = evt.send(EngineEvent::Done {
                 photo_id,
                 result_path: Some(out_path),
-                proxy_updated: req.scope == Scope::Preview,
+                proxy_updated: matches!(req.scope, Scope::Preview | Scope::Base),
             });
         }
         Err(message) => {
@@ -192,9 +192,9 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
     let bytes = std::fs::read(&req.raw_path).map_err(|e| format!("读取原图失败: {e}"))?;
     let mut img = decode_auto(&req.raw_path, &bytes).map_err(|e| format!("解码失败: {e}"))?;
 
-    // 预览模式：缩小到代理尺寸（最长边可配置，默认 1600px），显著提升编辑响应速度；
+    // 预览 / 底图模式：缩小到代理尺寸（最长边可配置，默认 1600px），显著提升编辑响应速度；
     // 导出模式保持全分辨率。
-    if req.scope == Scope::Preview {
+    if matches!(req.scope, Scope::Preview | Scope::Base) {
         let max_edge = req.preview_max_edge.unwrap_or(1600).max(320);
         if img.width.max(img.height) > max_edge {
             let scale = max_edge as f32 / img.width.max(img.height) as f32;
@@ -202,6 +202,14 @@ fn process_request(req: &EngineRequest, engine: &Arc<Mutex<RetouchEngine>>) -> R
             let h = ((img.height as f32 * scale).round() as u32).max(1);
             img = resize_bilinear(&img, w, h);
         }
+    }
+
+    // Base 模式：仅解码 + 降采样，不跑管线（WebGL 实时预览底图）。
+    if req.scope == Scope::Base {
+        let png_path = format!("{}.base.png", req.raw_path);
+        let png = encode_png(&img);
+        std::fs::write(&png_path, &png).map_err(|e| format!("写底图失败: {e}"))?;
+        return Ok(png_path);
     }
 
     // 2. Recipe → Pipeline
@@ -380,10 +388,11 @@ fn recipe_to_pipeline(recipe: &bus::Recipe, w: u32, h: u32) -> Pipeline {
         p.inpaint_mask = Some(mask);
     }
 
-    // 滤镜：内置预设 LUT（warm/cool/bw/vivid）；.cube 文件加载后续接入
+    // 滤镜：内置预设 LUT（warm/cool/bw/vivid）；.cube 文件加载后续接入。
+    // 强度 0..1：向恒等 LUT 混合（修复导出与 UI 强度不一致）。
     if let Some(filter) = &recipe.filter {
         if let Some(lut) = builtin_filter_lut(&filter.lut_id) {
-            p.filter_lut = Some(lut);
+            p.filter_lut = Some(lut.blended(filter.intensity));
         }
     }
 

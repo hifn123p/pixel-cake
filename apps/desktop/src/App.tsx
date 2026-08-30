@@ -36,6 +36,8 @@ export default function App() {
   const [recipe, setRecipe] = useState<Recipe>(defaultRecipe());
   const [progress, setProgress] = useState<number | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  // WebGL 实时预览底图（仅解码、未调色；GPU 叠加实时参数）。
+  const [baseSrc, setBaseSrc] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [draftPoints, setDraftPoints] = useState<Point2D[]>([]);
   const [newName, setNewName] = useState("");
@@ -48,6 +50,37 @@ export default function App() {
   const renderTimer = useRef<number | null>(null);
   const batchTotal = useRef(0);
   const batchDone = useRef(0);
+  // photoId → 底图 base64 缓存（避免切回照片时重复请求后端）。
+  const baseCache = useRef(new Map<string, string>());
+  // 正在请求底图的 photo_id（done 事件据此分流读取 read_base）。
+  const pendingBase = useRef<string | null>(null);
+
+  /** 是否纯参数编辑（无 AI 依赖操作）→ 可走 WebGL 实时预览。 */
+  function webglEligible(r: Recipe): boolean {
+    return (
+      !r.neutral_gray.enabled &&
+      !r.beauty.enabled &&
+      r.beauty.manual_points.length === 0 &&
+      r.inpaint.length === 0 &&
+      !r.color.enabled
+    );
+  }
+
+  /** 请求后端生成底图（仅解码+降采样）并读回缓存。 */
+  function ensureBase(p: Photo) {
+    const cached = baseCache.current.get(p.id);
+    if (cached) {
+      setBaseSrc(cached);
+      return;
+    }
+    if (pendingBase.current === p.id) return; // 已在途
+    pendingBase.current = p.id;
+    api
+      .submitRender(p.id, defaultRecipe(), "base", {
+        previewMaxEdge: settings.previewMaxEdge,
+      })
+      .catch(console.error);
+  }
 
   // 启动：加载项目列表 + 用户设置；订阅引擎事件。
   useEffect(() => {
@@ -82,15 +115,28 @@ export default function App() {
             setBatchInfo(`批量导出 ${batchDone.current}/${batchTotal.current}`);
           }
         }
-        // 读取 PNG 预览（后端按 photo_id 查询路径）
-        api
-          .readPreview(e.photo_id)
-          .then((b64) => setPreviewSrc(`data:image/png;base64,${b64}`))
-          .catch(console.error);
+        // 读取 PNG 预览（后端按 photo_id 查询路径）。
+        // Base 模式（WebGL 底图）与 Preview 模式（调色预览）分流。
+        if (pendingBase.current === e.photo_id) {
+          pendingBase.current = null;
+          api
+            .readBase(e.photo_id)
+            .then((b64) => {
+              baseCache.current.set(e.photo_id, b64);
+              setBaseSrc(`data:image/png;base64,${b64}`);
+            })
+            .catch(console.error);
+        } else {
+          api
+            .readPreview(e.photo_id)
+            .then((b64) => setPreviewSrc(`data:image/png;base64,${b64}`))
+            .catch(console.error);
+        }
       } else if (e.type === "error") {
         console.error(e.message);
         setError(e.message);
         setProgress(null);
+        if (pendingBase.current === e.photo_id) pendingBase.current = null;
       }
     });
     return () => {
@@ -131,6 +177,7 @@ export default function App() {
       setPhotos(ph);
       setPhoto(null);
       setPreviewSrc(null);
+      setBaseSrc(null);
       api.saveSetting("last_project", proj.id).catch(console.error);
     } catch (e) {
       setError(String(e));
@@ -154,6 +201,7 @@ export default function App() {
     setProjectId(id);
     setPhoto(null);
     setPreviewSrc(null);
+    setBaseSrc(null);
     try {
       setPhotos(await api.listPhotos(id));
     } catch (e) {
@@ -163,11 +211,15 @@ export default function App() {
 
   async function selectPhoto(p: Photo) {
     setPhoto(p);
+    setPreviewSrc(null);
+    setBaseSrc(null);
+    setDraftPoints([]);
+    setDrawing(false);
     try {
-      const r = await api.getRecipe(p.id);
-      setRecipe(r ?? defaultRecipe());
-      setDraftPoints([]);
-      setDrawing(false);
+      const r = (await api.getRecipe(p.id)) ?? defaultRecipe();
+      setRecipe(r);
+      // 纯参数编辑（无 AI 操作）：取底图走 WebGL 实时预览。
+      if (webglEligible(r)) ensureBase(p);
     } catch (e) {
       setError(String(e));
     }
@@ -209,11 +261,18 @@ export default function App() {
   }
 
   // 编辑即保存，并提交代理图预览（文档 §4.8：预览与重算靠 recipe 解耦）。
-  // 预览重算带 200ms 防抖，避免滑块拖动时高频触发后端全链路。
+  // 纯参数编辑（无 AI 操作）走 WebGL 实时预览：滑块零延迟，不发起后端重算；
+  // 启用 AI 操作时回退后端全链路 PNG 预览（200ms 防抖，避免拖动高频触发）。
   function updateRecipe(next: Recipe) {
     setRecipe(next);
     if (!photo) return;
     api.saveRecipe(photo.id, next).catch(console.error);
+    if (webglEligible(next)) {
+      if (renderTimer.current) window.clearTimeout(renderTimer.current);
+      renderTimer.current = null;
+      ensureBase(photo);
+      return;
+    }
     if (renderTimer.current) window.clearTimeout(renderTimer.current);
     renderTimer.current = window.setTimeout(() => {
       api
@@ -440,6 +499,8 @@ export default function App() {
             drawing={drawing}
             draftPoints={draftPoints}
             onImageClick={(nx, ny) => setDraftPoints((p) => [...p, { x: nx, y: ny }])}
+            webglSrc={photo && webglEligible(recipe) ? baseSrc : null}
+            webglRecipe={photo && webglEligible(recipe) ? recipe : null}
           />
         </main>
 

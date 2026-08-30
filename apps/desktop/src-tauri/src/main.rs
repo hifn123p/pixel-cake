@@ -22,6 +22,7 @@ fn main() {
             commands::get_recipe,
             commands::submit_render,
             commands::read_preview,
+            commands::read_base,
             commands::save_preset_cmd,
             commands::list_presets_cmd,
             commands::get_settings,

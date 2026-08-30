@@ -1,6 +1,8 @@
-// 画布：显示代理图预览 + 进度 + 祛瑕多边形绘制叠加层。
+// 画布：显示代理图预览（后端 PNG 轮询）或 WebGL2 实时预览（GPU 即时调色）+ 进度 + 祛瑕叠加层。
 
 import { useRef } from "react";
+import type { Recipe } from "../../api/types";
+import WebGLPreview from "./WebGLPreview";
 
 export interface Point2D {
   x: number;
@@ -9,6 +11,7 @@ export interface Point2D {
 
 interface Props {
   photoName: string | null;
+  /** 后端全链路 PNG 预览（AI 操作启用时使用）。 */
   previewSrc: string | null;
   progress: number | null;
   /** 是否处于祛瑕绘制模式。 */
@@ -17,6 +20,9 @@ interface Props {
   draftPoints: Point2D[];
   /** 点击图像回调（归一化坐标）。 */
   onImageClick: (nx: number, ny: number) => void;
+  /** WebGL 实时预览：底图 + 实时调色参数。任一为 null 则用 previewSrc。 */
+  webglSrc?: string | null;
+  webglRecipe?: Recipe | null;
 }
 
 export default function Canvas({
@@ -26,6 +32,8 @@ export default function Canvas({
   drawing,
   draftPoints,
   onImageClick,
+  webglSrc,
+  webglRecipe,
 }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -41,7 +49,14 @@ export default function Canvas({
 
   return (
     <div className="canvas">
-      {previewSrc ? (
+      {webglSrc && webglRecipe ? (
+        <WebGLPreview
+          imgSrc={webglSrc}
+          recipe={webglRecipe}
+          photoName={photoName}
+          onImageClick={onImageClick}
+        />
+      ) : previewSrc ? (
         <div className="canvas-image" onClick={handleClick}>
           <img
             ref={imgRef}
@@ -93,7 +108,7 @@ export default function Canvas({
       ) : (
         <div className="canvas-empty">
           <p>导入照片开始编辑</p>
-          <p className="muted">WebGL2 实时预览引擎将在后续版本接入</p>
+          <p className="muted">基础调色与滤镜在 GPU 上实时预览，AI 功能走后端全链路</p>
         </div>
       )}
     </div>

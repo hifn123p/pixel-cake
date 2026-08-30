@@ -161,6 +161,26 @@ impl Lut3D {
         }
         dst
     }
+
+    /// 按强度向恒等 LUT 混合：`intensity=0` 恒等，`1` 全量。
+    /// 用于滤镜强度（UI 0..100%）与追色强度的实时调节。
+    pub fn blended(&self, intensity: f32) -> Self {
+        let t = intensity.clamp(0.0, 1.0);
+        if t >= 1.0 {
+            return Self {
+                size: self.size,
+                table: self.table.clone(),
+            };
+        }
+        Self::from_fn(self.size, |c| {
+            let o = self.apply(c);
+            [
+                c[0] + (o[0] - c[0]) * t,
+                c[1] + (o[1] - c[1]) * t,
+                c[2] + (o[2] - c[2]) * t,
+            ]
+        })
+    }
 }
 
 /// 内置滤镜 LUT（无 `.cube` 文件时的兜底预设）。

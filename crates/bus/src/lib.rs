@@ -191,10 +191,14 @@ impl Default for Recipe {
     }
 }
 
-/// 重算范围（文档 §7）：代理图预览 or 全分辨率导出。
+/// 重算范围（文档 §7）：代理图预览 / WebGL 实时预览底图 / 全分辨率导出。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Scope {
+    /// 仅解码 + 降采样，不跑任何调色管线（WebGL 实时预览的底图）。
+    Base,
+    /// 代理图预览（完整管线，最长边可配置）。
     Preview,
+    /// 全分辨率导出。
     Export,
 }
 
