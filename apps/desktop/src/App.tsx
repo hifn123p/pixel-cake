@@ -429,7 +429,7 @@ export default function App() {
           <button onClick={() => setAbout(true)}>关于</button>
         </nav>
         <span className="menubar-right">
-          {busy ? "处理中…" : `v0.2.0 · ${settings.theme === "light" ? "浅色" : "深色"}`}
+          {busy ? "处理中…" : `v0.2.1 · ${settings.theme === "light" ? "浅色" : "深色"}`}
         </span>
       </header>
 
@@ -574,7 +574,7 @@ export default function App() {
         <div className="modal-mask" onClick={() => setAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>像素蛋糕</h2>
-            <p className="muted">版本 0.2.0</p>
+            <p className="muted">版本 0.2.1</p>
             <p>
               本地 AI 修图客户端：中性灰磨皮、AI 美型、祛瑕、AI 追色、基础调色、滤镜。
             </p>
