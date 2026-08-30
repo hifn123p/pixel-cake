@@ -273,8 +273,9 @@ export default function App() {
   /** 在资源管理器中定位导出结果。 */
   async function revealResult() {
     if (!photo) return;
+    const ext = settings.exportFormat === "png" ? "png" : "tiff";
     try {
-      await api.revealInExplorer(`${photo.raw_path}.out.tiff`);
+      await api.revealInExplorer(`${photo.raw_path}.out.${ext}`);
     } catch (e) {
       setError(String(e));
     }
