@@ -46,7 +46,7 @@ impl FaceDetector {
     /// 从 `.onnx` 模型文件创建检测器（CUDA EP）。
     pub fn new(model_path: &str) -> Result<Self, String> {
         Ok(Self {
-            session: InferSession::from_file_cuda(model_path)?,
+            session: InferSession::from_file(model_path)?,
             input_size: 640,
             score_threshold: 0.5,
             iou_threshold: 0.4,

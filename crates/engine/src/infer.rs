@@ -1,13 +1,18 @@
-//! ONNX Runtime 推理封装（CUDA EP）。
+//! ONNX Runtime 推理封装（CUDA / DirectML / CPU 多执行提供者自动降级）。
 //!
 //! 作为人脸检测 / 语义分割 / 关键点 / 磨皮等 AI 算子的共用基础设施：
-//! 封装 Session 加载（CUDA 执行提供者）、输入/输出张量转换，
-//! 以及 `ImageBuf`（线性 RGB 16bit）→ NCHW `f32` 张量的预处理。
+//! 封装 Session 加载（按 CUDA → DirectML → CPU 顺序注册执行提供者）、
+//! 输入/输出张量转换，以及 `ImageBuf`（线性 RGB 16bit）→ NCHW `f32` 张量的预处理。
 //!
 //! 依赖 `ort` crate（默认含 `download-binaries`：构建时下载 ORT 二进制，
-//! `copy-dylibs`：复制 `onnxruntime*.dll` 到 target；`cuda` feature 启用 CUDA EP）。
+//! `copy-dylibs`：复制 `onnxruntime*.dll` 到 target；`cuda` feature 启用 CUDA EP、
+//! `directml` feature 启用 DirectML EP——pyke 预编译的 Windows 二进制默认内置 DirectML）。
 //!
-//! 注意：CUDA EP 需运行时环境满足 CUDA ≥ 13.2 + cuDNN ≥ 9.23（见 ort 文档）。
+//! 执行提供者选择策略（按优先级，注册失败自动落到下一个）：
+//! 1. **CUDA EP**（NVIDIA 独显，需运行时 CUDA ≥ 13.2 + cuDNN ≥ 9.23，见 ort 文档）
+//! 2. **DirectML EP**（任意 DirectX 12 GPU：Intel / AMD 核显、N 卡；Windows 10 1903+）
+//! 3. **CPU EP**（兜底，任何机器可用）
+//! 这样无独显（核显）机器也能获得 GPU 加速，纯 CPU 机器可正常推理。
 
 use ndarray::Array4;
 use ort::session::Session;
@@ -16,20 +21,26 @@ use ort::{ep, inputs};
 
 use crate::image::{linear_to_srgb, ImageBuf};
 
-/// 推理会话：持有 ONNX Runtime Session（注册 CUDA 执行提供者）。
+/// 推理会话：持有 ONNX Runtime Session（注册 CUDA / DirectML 执行提供者）。
 pub struct InferSession {
     session: Session,
 }
 
 impl InferSession {
-    /// 从 `.onnx` 文件加载模型，注册 CUDA 执行提供者。
+    /// 从 `.onnx` 文件加载模型，注册执行提供者。
     ///
-    /// 注册失败时 ort 默认静默回退 CPU；若希望失败即报错，可改用
+    /// 按 **CUDA → DirectML → CPU** 顺序注册：有 NVIDIA 独显且 CUDA 库可用时走
+    /// CUDA；否则（Intel / AMD 核显等）走 DirectML（DirectX 12）；都不行则 CPU 兜底。
+    /// 注册失败时 ort 默认静默回退下一提供者；若希望失败即报错，可改用
     /// `ep::CUDA::default().build().error_on_failure()`。
-    pub fn from_file_cuda(path: &str) -> Result<Self, String> {
+    pub fn from_file(path: &str) -> Result<Self, String> {
         let session = Session::builder()
             .map_err(|e| e.to_string())?
-            .with_execution_providers([ep::CUDA::default().build()])
+            .with_execution_providers([
+                ep::CUDA::default().build(),
+                #[cfg(feature = "directml")]
+                ep::DirectML::default().build(),
+            ])
             .map_err(|e| e.to_string())?
             .commit_from_file(path)
             .map_err(|e| e.to_string())?;

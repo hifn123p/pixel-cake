@@ -47,5 +47,6 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# ===== 图标由 scripts/gen_icon.mjs 在 CI 内生成，不入库（避免二进制传输）=====
-apps/desktop/src-tauri/icons/
+# ===== 图标（icon.ico / icon.png / 16-256 多尺寸）已入库，CI 不再生成 =====
+# 源图与处理脚本在 assets-logo/（不入库，开发者本地生成新图标时用）
+assets-logo/

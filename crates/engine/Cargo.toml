@@ -6,9 +6,11 @@ edition.workspace = true
 [dependencies]
 bus = { path = "../bus" }
 libraw-rs = "0.0.4"
-# ONNX Runtime（CUDA EP）。默认 features 含 download-binaries（构建时下载 ORT 二进制）
-# 与 copy-dylibs（复制 onnxruntime*.dll 到 target）。cuda feature 启用 CUDA 执行提供者。
-ort = { version = "2.0.0-rc.13", features = ["cuda"] }
+# ONNX Runtime。默认 features 含 download-binaries（构建时下载 ORT 二进制）
+# 与 copy-dylibs（复制 onnxruntime*.dll 到 target）。
+# cuda：NVIDIA GPU 执行提供者；directml：DirectX 12 GPU（Intel/AMD 核显 / 无 N 卡时）
+# 执行提供者（DirectML EP，Windows 10 1903+）。运行时按 CUDA → DirectML → CPU 自动降级。
+ort = { version = "2.0.0-rc.13", features = ["cuda", "directml"] }
 ndarray = "0.17"
 # 通用图片解码（JPEG/PNG），最小化 feature。
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

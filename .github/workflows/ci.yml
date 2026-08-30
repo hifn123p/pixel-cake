@@ -2,8 +2,8 @@
 # 在 GitHub 托管的 windows-latest（自带 MSVC + Windows SDK + WebView2）上执行，
 # 解决本地缺链接器的问题。产物为 NSIS 安装包 (.exe)。
 #
-# 说明：图标文件（icon.ico/png）不入库，由 scripts/gen_icon.mjs 在 CI 内生成，
-# 避免二进制文件传输问题。
+# 说明：图标文件（icon.ico / icon.png / 16-256 多尺寸）已入库，CI 直接用。
+# 源图与处理脚本在 assets-logo/（不入库，开发者本地生成新图标时用）。
 
 name: CI
 
@@ -32,9 +32,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: 生成图标
-        run: node scripts/gen_icon.mjs
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
@@ -67,9 +64,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
-
-      - name: 生成图标
-        run: node scripts/gen_icon.mjs
 
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
